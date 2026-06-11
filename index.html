@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUI Outreach Admin</title>
+    <!-- Use Outfit and Inter fonts like the Flutter app -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-earth-americas logo-icon"></i>
+                <h2>PUI Admin</h2>
+            </div>
+            <ul class="nav-links">
+                <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</li>
+                <li data-tab="users"><i class="fa-solid fa-users-gear"></i> Users</li>
+                <li data-tab="lookups"><i class="fa-solid fa-list-check"></i> Lookups Setup</li>
+                <li data-tab="export"><i class="fa-solid fa-file-export"></i> Data Export</li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="user-profile">
+                    <span class="status-indicator online"></span>
+                    <span>Admin Mode</span>
+                </div>
+            </header>
+
+            <!-- Dashboard Tab -->
+            <section id="dashboard" class="tab-content active">
+                <div class="glass-card welcome-card">
+                    <h2>Platform Overview</h2>
+                    <p>Welcome to the Administrative Panel. View synchronized records across your entire platform.</p>
+                </div>
+                
+                <div class="stats-grid" id="stats-container">
+                    <!-- Stats cards injected via JS -->
+                    <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading stats...</div>
+                </div>
+            </section>
+
+            <!-- Users Tab -->
+            <section id="users" class="tab-content">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>Manage Field Workers</h2>
+                        <button class="btn btn-primary" onclick="app.showUserModal()"><i class="fa-solid fa-plus"></i> Add User</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr><td colspan="3" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lookups Tab -->
+            <section id="lookups" class="tab-content">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>Manage Platform Data</h2>
+                        <div class="dropdown-container">
+                            <select id="lookup-table-select" onchange="app.loadLookupTable()">
+                                <option value="Projects">Projects</option>
+                                <option value="Shelters">Shelters</option>
+                                <option value="DocumentTypes">Document Types</option>
+                                <option value="HealthTopics">Health Topics</option>
+                                <option value="KitsTypes">Kits Types</option>
+                                <option value="TargetCategories">Target Categories</option>
+                                <option value="CounselingTopics">Counseling Topics</option>
+                                <option value="PHCCs">PHCCs</option>
+                                <option value="Frontliners">Frontliners</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="app.showLookupModal()"><i class="fa-solid fa-plus"></i> Add Record</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr id="lookups-table-head">
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lookups-table-body">
+                                <tr><td colspan="3" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Export Tab -->
+            <section id="export" class="tab-content">
+                <div class="glass-card">
+                    <h2>Data Extraction (.XLSX)</h2>
+                    <p class="mb-4">Download the full synchronized datasets for analysis in Microsoft Excel.</p>
+                    
+                    <div class="export-grid">
+                        <div class="export-card">
+                            <i class="fa-solid fa-box-open text-cyan"></i>
+                            <h3>Kits Distribution</h3>
+                            <button class="btn btn-outline" onclick="app.exportData('KitsDistribution')">Download XLSX</button>
+                        </div>
+                        <div class="export-card">
+                            <i class="fa-solid fa-users text-cyan"></i>
+                            <h3>Awareness Sessions</h3>
+                            <button class="btn btn-outline" onclick="app.exportData('AwarenessSessions')">Download XLSX</button>
+                        </div>
+                        <div class="export-card">
+                            <i class="fa-solid fa-clipboard-user text-cyan"></i>
+                            <h3>MW Counseling</h3>
+                            <button class="btn btn-outline" onclick="app.exportData('MWCounseling')">Download XLSX</button>
+                        </div>
+                        <div class="export-card">
+                            <i class="fa-solid fa-child text-cyan"></i>
+                            <h3>SRA Forms</h3>
+                            <button class="btn btn-outline" onclick="app.exportData('SRAForm')">Download XLSX</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content glass-card">
+            <span class="close-btn" onclick="app.closeModals()">&times;</span>
+            <h2>Add / Edit User</h2>
+            <form id="user-form" onsubmit="app.saveUser(event)">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="user-username" required placeholder="e.g. his_team_south">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="user-password" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="user-role">
+                        <option value="FieldWorker">Field Worker</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-3">Save User</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="lookup-modal" class="modal">
+        <div class="modal-content glass-card">
+            <span class="close-btn" onclick="app.closeModals()">&times;</span>
+            <h2 id="lookup-modal-title">Add Record</h2>
+            <form id="lookup-form" onsubmit="app.saveLookup(event)">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="lookup-name" required placeholder="e.g. Emergency Response">
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-3">Save Record</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Message here</div>
+
+    <script src="app.js"></script>
+</body>
+</html>
