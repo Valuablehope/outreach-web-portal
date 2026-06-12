@@ -13,7 +13,108 @@ const App = {
         this.renderLookupChips();
         this.renderRecordChips();
         this.renderExportGrid();
+
+        if (this._token()) {
+            this.showApp();
+        } else {
+            this.showLogin();
+        }
+    },
+
+    // ------------------------------------------------------------
+    // AUTH
+    // ------------------------------------------------------------
+    _token() { return localStorage.getItem('pui-token'); },
+
+    // Authenticated fetch for /api/admin endpoints; a 401 means the
+    // token expired (or the server restarted) — back to the login screen.
+    async api(path, opts = {}) {
+        const res = await fetch(`${API_BASE_URL}${path}`, {
+            ...opts,
+            headers: { ...(opts.headers || {}), 'Authorization': `Bearer ${this._token()}` },
+        });
+        if (res.status === 401) {
+            this.forceLogout('Your session has expired. Please sign in again.');
+            throw new Error('Unauthorized');
+        }
+        return res;
+    },
+
+    showLogin(message) {
+        document.getElementById('app-container').hidden = true;
+        document.getElementById('login-screen').hidden = false;
+        const err = document.getElementById('login-error');
+        err.hidden = !message;
+        if (message) err.innerText = message;
+        setTimeout(() => document.getElementById('login-username').focus(), 50);
+    },
+
+    showApp() {
+        document.getElementById('login-screen').hidden = true;
+        document.getElementById('app-container').hidden = false;
+        const username = localStorage.getItem('pui-user') || 'Admin';
+        document.getElementById('user-name').innerText = username;
+        const avatar = document.getElementById('user-avatar');
+        avatar.innerText = username.slice(0, 2).toUpperCase();
+        avatar.style.background = this._avatarColor(username);
+        this.navigate('dashboard');
         this.loadDashboard();
+    },
+
+    async login(e) {
+        e.preventDefault();
+        const btn = document.getElementById('login-btn');
+        const err = document.getElementById('login-error');
+        err.hidden = true;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Signing in...';
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: document.getElementById('login-username').value.trim(),
+                    password: document.getElementById('login-password').value,
+                }),
+            });
+            let json = null;
+            try { json = await res.json(); } catch { /* non-JSON (e.g. 404 page) */ }
+            if (json && json.success) {
+                localStorage.setItem('pui-token', json.token);
+                localStorage.setItem('pui-user', json.username);
+                document.getElementById('login-password').value = '';
+                this.showApp();
+                this.showToast(`Welcome back, ${json.username}!`);
+            } else if (res.status === 404) {
+                err.innerText = 'The backend has not been updated with login support yet. Pull and restart the server, then try again.';
+                err.hidden = false;
+            } else {
+                err.innerText = (json && json.error) || 'Sign in failed. Please try again.';
+                err.hidden = false;
+            }
+        } catch (ex) {
+            console.error(ex);
+            err.innerText = 'Could not reach the server. Check your connection and the tunnel URL.';
+            err.hidden = false;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+        }
+    },
+
+    async logout() {
+        const ok = await this.confirmDialog('Sign out of the admin portal?', 'Sign Out');
+        if (!ok) return;
+        this.forceLogout();
+    },
+
+    forceLogout(message) {
+        localStorage.removeItem('pui-token');
+        localStorage.removeItem('pui-user');
+        this.closeDrawer();
+        this.closePalette();
+        document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
+        this.showLogin(message);
     },
 
     bindEvents() {
@@ -134,7 +235,7 @@ const App = {
     async loadStats() {
         const container = document.getElementById('stats-container');
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/stats`);
+            const res = await this.api('/api/admin/stats');
             const json = await res.json();
             if (!json.success) throw new Error('stats failed');
             this._setHealth(true);
@@ -198,7 +299,7 @@ const App = {
         const area = document.getElementById('charts-area');
         const note = document.getElementById('charts-unavailable');
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/analytics`);
+            const res = await this.api('/api/admin/analytics');
             if (!res.ok) throw new Error('analytics unavailable');
             const json = await res.json();
             if (!json.success) throw new Error('analytics failed');
@@ -311,7 +412,7 @@ const App = {
     // ------------------------------------------------------------
     async loadUsers() {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/users`);
+            const res = await this.api('/api/admin/users');
             const json = await res.json();
             this._usersData = (json.success && json.data) || [];
             this.renderUsers();
@@ -396,11 +497,11 @@ const App = {
 
         const editing = !!this._editingUser;
         const url = editing
-            ? `${API_BASE_URL}/api/admin/users/${encodeURIComponent(this._editingUser)}`
-            : `${API_BASE_URL}/api/admin/users`;
+            ? `/api/admin/users/${encodeURIComponent(this._editingUser)}`
+            : `/api/admin/users`;
 
         try {
-            const res = await fetch(url, {
+            const res = await this.api(url, {
                 method: editing ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(editing ? { password, role } : { username, password, role }),
@@ -423,7 +524,7 @@ const App = {
         const ok = await this.confirmDialog(`Delete user "${username}"? This cannot be undone.`);
         if (!ok) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/users/${username}`, { method: 'DELETE' });
+            const res = await this.api(`/api/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 this.showToast('User deleted');
@@ -460,7 +561,7 @@ const App = {
         const tbody = document.getElementById('lookups-table-body');
         tbody.innerHTML = '<tr><td colspan="2"><div class="skeleton-rows"></div></td></tr>';
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/lookups/${table}`);
+            const res = await this.api(`/api/admin/lookups/${table}`);
             const json = await res.json();
             if (json.success && json.data.length > 0) {
                 const keys = Object.keys(json.data[0]);
@@ -510,10 +611,10 @@ const App = {
         const name = document.getElementById('lookup-name').value;
         const editingId = this._editingLookupId;
         const url = editingId
-            ? `${API_BASE_URL}/api/admin/lookups/${table}/${encodeURIComponent(editingId)}`
-            : `${API_BASE_URL}/api/admin/lookups/${table}`;
+            ? `/api/admin/lookups/${table}/${encodeURIComponent(editingId)}`
+            : `/api/admin/lookups/${table}`;
         try {
-            const res = await fetch(url, {
+            const res = await this.api(url, {
                 method: editingId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name }),
@@ -537,7 +638,7 @@ const App = {
         const ok = await this.confirmDialog(`Delete this ${this._prettyName(table)} record? Records referencing it may break.`);
         if (!ok) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/lookups/${table}/${id}`, { method: 'DELETE' });
+            const res = await this.api(`/api/admin/lookups/${table}/${id}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 this.showToast('Record deleted');
@@ -691,7 +792,7 @@ const App = {
         tbody.innerHTML = '<tr><td><div class="skeleton-rows"></div></td></tr>';
         try {
             await this._ensureLookupCache();
-            const res = await fetch(`${API_BASE_URL}/api/admin/records/${table}`);
+            const res = await this.api(`/api/admin/records/${table}`);
             const json = await res.json();
             if (!json.success) throw new Error(json.error || 'Failed to load records');
             this._records = { table, idCol: json.idCol, data: json.data };
@@ -843,8 +944,8 @@ const App = {
         });
 
         try {
-            const res = await fetch(
-                `${API_BASE_URL}/api/admin/records/${editing.table}/${encodeURIComponent(editing.id)}`, {
+            const res = await this.api(
+                `/api/admin/records/${editing.table}/${encodeURIComponent(editing.id)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
@@ -890,12 +991,12 @@ const App = {
     },
 
     exportData(table) {
-        window.location.href = `${API_BASE_URL}/api/admin/export/${table}`;
+        window.location.href = `${API_BASE_URL}/api/admin/export/${table}?token=${encodeURIComponent(this._token() || '')}`;
         this.showToast(`Downloading ${table}.xlsx...`);
     },
 
     downloadTemplate(table) {
-        window.location.href = `${API_BASE_URL}/api/admin/template/${table}`;
+        window.location.href = `${API_BASE_URL}/api/admin/template/${table}?token=${encodeURIComponent(this._token() || '')}`;
         this.showToast(`Downloading ${table} template...`);
     },
 
@@ -919,7 +1020,7 @@ const App = {
         this.showToast(`Importing ${file.name}...`);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/import/${this._importTable}`, {
+            const res = await this.api(`/api/admin/import/${this._importTable}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream' },
                 body: file,
@@ -955,8 +1056,9 @@ const App = {
     // ------------------------------------------------------------
     // CONFIRM DIALOG
     // ------------------------------------------------------------
-    confirmDialog(message) {
+    confirmDialog(message, yesLabel = 'Delete') {
         document.getElementById('confirm-message').innerText = message;
+        document.getElementById('confirm-yes').innerText = yesLabel;
         document.getElementById('confirm-modal').classList.add('show');
         return new Promise(resolve => { this._confirmResolve = resolve; });
     },
@@ -985,6 +1087,7 @@ const App = {
             { icon: 'fa-plus', label: 'Add lookup record', hint: 'Lookups', run: () => { this.navigate('lookups'); this.showLookupModal(); } },
             { icon: 'fa-rotate', label: 'Refresh dashboard', hint: 'Dashboard', run: () => { this.navigate('dashboard'); this.loadDashboard(true); } },
             { icon: 'fa-circle-half-stroke', label: 'Toggle dark / light theme', hint: 'Theme', run: () => this.toggleTheme() },
+            { icon: 'fa-right-from-bracket', label: 'Sign out', hint: 'Session', run: () => this.logout() },
             ...data,
         ];
     },

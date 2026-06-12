@@ -7,11 +7,37 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=6">
+    <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 
-    <div class="app-container">
+    <!-- Login screen -->
+    <div id="login-screen" class="login-screen" hidden>
+        <div class="login-card">
+            <div class="login-brand">
+                <div class="logo-badge login-logo"><i class="fa-solid fa-earth-americas"></i></div>
+                <h2>PUI Outreach Admin</h2>
+                <p>Sign in with your Admin account to continue</p>
+            </div>
+            <form id="login-form" onsubmit="app.login(event)">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" required autocomplete="username" placeholder="Username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="Password">
+                </div>
+                <div id="login-error" class="alert alert-error" hidden></div>
+                <button type="submit" class="btn btn-primary w-100" id="login-btn">
+                    <i class="fa-solid fa-right-to-bracket"></i> Sign In
+                </button>
+            </form>
+            <div class="login-foot"><i class="fa-solid fa-shield-halved"></i> Secure Admin Console</div>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" hidden>
         <!-- Sidebar -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -57,6 +83,11 @@
                         <span class="status-indicator" id="health-dot"></span>
                         <span id="health-label">Checking...</span>
                     </div>
+                    <div class="user-profile" id="user-chip">
+                        <span class="avatar avatar-sm" id="user-avatar"></span>
+                        <span id="user-name"></span>
+                    </div>
+                    <button class="icon-btn" onclick="app.logout()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button>
                 </div>
             </header>
 
@@ -274,6 +305,6 @@
     <!-- Toast stack -->
     <div id="toast-stack" class="toast-stack"></div>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>
