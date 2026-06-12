@@ -230,6 +230,59 @@ const App = {
         this.showToast(`Downloading ${table}.xlsx...`);
     },
 
+    // --- TEMPLATES & IMPORT ---
+    downloadTemplate(table) {
+        window.location.href = `${API_BASE_URL}/api/admin/template/${table}`;
+        this.showToast(`Downloading ${table} template...`);
+    },
+
+    startImport(table) {
+        this._importTable = table;
+        const input = document.getElementById('import-file-input');
+        input.value = '';
+        input.click();
+    },
+
+    async handleImportFile(e) {
+        const file = e.target.files[0];
+        if (!file || !this._importTable) return;
+
+        const resultBox = document.getElementById('import-result');
+        resultBox.innerHTML = '<p>Uploading and validating, please wait...</p>';
+        this.showToast(`Importing ${file.name}...`);
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/import/${this._importTable}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: file
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                resultBox.innerHTML = `<p style="color: #4caf50;">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Imported ${json.imported} record(s) into ${this._importTable} successfully.</p>`;
+                this.showToast('Import successful');
+                this.loadStats();
+            } else {
+                const items = (json.errors || ['Unknown error']).slice(0, 25)
+                    .map(err => `<li>${err}</li>`).join('');
+                const more = (json.errors || []).length > 25
+                    ? `<p>...and ${json.errors.length - 25} more error(s).</p>` : '';
+                resultBox.innerHTML = `<div style="color: #ff5252;">
+                    <p><i class="fa-solid fa-circle-xmark"></i>
+                    Nothing was imported. Please fix the following and upload again:</p>
+                    <ul>${items}</ul>${more}</div>`;
+                this.showToast('Import failed — see details below');
+            }
+        } catch (err) {
+            console.error(err);
+            resultBox.innerHTML = '<p style="color: #ff5252;">Upload failed. Check your connection and try again.</p>';
+            this.showToast('Import failed');
+        }
+    },
+
     // --- UTILS ---
     closeModals() {
         document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));

@@ -123,23 +123,34 @@
                             <i class="fa-solid fa-box-open text-cyan"></i>
                             <h3>Kits Distribution</h3>
                             <button class="btn btn-outline" onclick="app.exportData('KitsDistribution')">Download XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('KitsDistribution')">Download Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('KitsDistribution')">Import Data</button>
                         </div>
                         <div class="export-card">
                             <i class="fa-solid fa-users text-cyan"></i>
                             <h3>Awareness Sessions</h3>
                             <button class="btn btn-outline" onclick="app.exportData('AwarenessSessions')">Download XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('AwarenessSessions')">Download Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('AwarenessSessions')">Import Data</button>
                         </div>
                         <div class="export-card">
                             <i class="fa-solid fa-clipboard-user text-cyan"></i>
                             <h3>MW Counseling</h3>
                             <button class="btn btn-outline" onclick="app.exportData('MWCounseling')">Download XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('MWCounseling')">Download Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('MWCounseling')">Import Data</button>
                         </div>
                         <div class="export-card">
                             <i class="fa-solid fa-child text-cyan"></i>
                             <h3>SRA Forms</h3>
                             <button class="btn btn-outline" onclick="app.exportData('SRAForm')">Download XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('SRAForm')">Download Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('SRAForm')">Import Data</button>
                         </div>
                     </div>
+                    <input type="file" id="import-file-input" accept=".xlsx" style="display: none"
+                           onchange="app.handleImportFile(event)">
+                    <div id="import-result" class="mt-4"></div>
                 </div>
             </section>
         </main>
