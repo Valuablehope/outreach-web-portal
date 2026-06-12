@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -94,7 +94,10 @@
                             </select>
                         </div>
                         <button class="btn btn-primary" onclick="app.showLookupModal()"><i class="fa-solid fa-plus"></i> Add Record</button>
+                        <button class="btn btn-outline" onclick="app.downloadLookupTemplate()"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
+                        <button class="btn btn-outline" onclick="app.startLookupImport()"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
                     </div>
+                    <div id="lookup-import-result"></div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
@@ -199,6 +202,6 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast">Message here</div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

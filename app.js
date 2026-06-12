@@ -231,9 +231,20 @@ const App = {
     },
 
     // --- TEMPLATES & IMPORT ---
+    _lookupTables: ['Projects', 'Shelters', 'DocumentTypes', 'HealthTopics',
+        'KitsTypes', 'TargetCategories', 'CounselingTopics', 'PHCCs', 'Frontliners'],
+
     downloadTemplate(table) {
         window.location.href = `${API_BASE_URL}/api/admin/template/${table}`;
         this.showToast(`Downloading ${table} template...`);
+    },
+
+    downloadLookupTemplate() {
+        this.downloadTemplate(document.getElementById('lookup-table-select').value);
+    },
+
+    startLookupImport() {
+        this.startImport(document.getElementById('lookup-table-select').value);
     },
 
     startImport(table) {
@@ -247,7 +258,8 @@ const App = {
         const file = e.target.files[0];
         if (!file || !this._importTable) return;
 
-        const resultBox = document.getElementById('import-result');
+        const isLookup = this._lookupTables.includes(this._importTable);
+        const resultBox = document.getElementById(isLookup ? 'lookup-import-result' : 'import-result');
         resultBox.innerHTML = '<p>Uploading and validating, please wait...</p>';
         this.showToast(`Importing ${file.name}...`);
 
@@ -260,11 +272,14 @@ const App = {
             const json = await res.json();
 
             if (json.success) {
+                const skipped = json.skipped
+                    ? ` (${json.skipped} already existing, skipped)` : '';
                 resultBox.innerHTML = `<p style="color: #4caf50;">
                     <i class="fa-solid fa-circle-check"></i>
-                    Imported ${json.imported} record(s) into ${this._importTable} successfully.</p>`;
+                    Imported ${json.imported} record(s) into ${this._importTable} successfully${skipped}.</p>`;
                 this.showToast('Import successful');
                 this.loadStats();
+                if (isLookup) this.loadLookupTable();
             } else {
                 const items = (json.errors || ['Unknown error']).slice(0, 25)
                     .map(err => `<li>${err}</li>`).join('');
