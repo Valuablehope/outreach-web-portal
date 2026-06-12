@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -23,6 +23,7 @@
                 <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</li>
                 <li data-tab="users"><i class="fa-solid fa-users-gear"></i> Users</li>
                 <li data-tab="lookups"><i class="fa-solid fa-list-check"></i> Lookups Setup</li>
+                <li data-tab="records"><i class="fa-solid fa-table-list"></i> Records</li>
                 <li data-tab="export"><i class="fa-solid fa-file-export"></i> Data Export</li>
             </ul>
         </nav>
@@ -115,6 +116,38 @@
                 </div>
             </section>
 
+            <!-- Records Tab -->
+            <section id="records" class="tab-content">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>Browse &amp; Edit Records</h2>
+                        <div class="dropdown-container">
+                            <select id="record-table-select" onchange="app.loadRecords()">
+                                <option value="KitsDistribution">Kits Distribution</option>
+                                <option value="KitsDistributionPeopleDetails">Kits — Household Members</option>
+                                <option value="AwarenessSessions">Awareness Sessions</option>
+                                <option value="MWCounseling">MW Counseling</option>
+                                <option value="SRAForm">SRA Forms</option>
+                            </select>
+                        </div>
+                        <input type="text" id="record-search" placeholder="Search..."
+                               oninput="app.renderRecords()"
+                               style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: inherit;">
+                    </div>
+                    <p class="mb-4" style="opacity: 0.7;">Showing the latest 200 records. Use search to narrow down, then click Edit.</p>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr id="records-table-head"></tr>
+                            </thead>
+                            <tbody id="records-table-body">
+                                <tr><td class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <!-- Export Tab -->
             <section id="export" class="tab-content">
                 <div class="glass-card">
@@ -199,9 +232,20 @@
         </div>
     </div>
 
+    <div id="record-modal" class="modal">
+        <div class="modal-content glass-card" style="max-height: 85vh; overflow-y: auto;">
+            <span class="close-btn" onclick="app.closeModals()">&times;</span>
+            <h2 id="record-modal-title">Edit Record</h2>
+            <form id="record-form" onsubmit="app.saveRecord(event)">
+                <div id="record-form-fields"></div>
+                <button type="submit" class="btn btn-primary w-100 mt-3">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast">Message here</div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
