@@ -1,140 +1,367 @@
 const API_BASE_URL = 'https://aims-progress-invest-output.trycloudflare.com';
 
 const App = {
+    // ------------------------------------------------------------
+    // INIT
+    // ------------------------------------------------------------
     init() {
+        this.applyTheme(localStorage.getItem('pui-theme') || 'light');
+        if (localStorage.getItem('pui-sidebar') === 'mini') {
+            document.querySelector('.app-container').classList.add('mini');
+        }
         this.bindEvents();
-        this.loadStats();
-        // Set first tab active
-        document.querySelector('.nav-links li').click();
+        this.renderLookupChips();
+        this.renderRecordChips();
+        this.renderExportGrid();
+        this.loadDashboard();
     },
 
     bindEvents() {
-        // Tab switching
         document.querySelectorAll('.nav-links li').forEach(item => {
-            item.addEventListener('click', (e) => {
-                // Remove active from all
-                document.querySelectorAll('.nav-links li').forEach(i => i.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-                // Add active to current
-                e.currentTarget.classList.add('active');
-                const tabId = e.currentTarget.getAttribute('data-tab');
-                document.getElementById(tabId).classList.add('active');
-
-                // Update page title
-                document.getElementById('page-title').innerText = e.currentTarget.innerText;
-
-                // Close the sidebar on mobile after navigating
-                document.getElementById('sidebar').classList.remove('open');
-
-                // Load tab data if needed
-                if (tabId === 'users') this.loadUsers();
-                if (tabId === 'lookups') this.loadLookupTable();
-                if (tabId === 'records') this.loadRecords();
-            });
+            item.addEventListener('click', () => this.navigate(item.getAttribute('data-tab')));
         });
 
-        // Mobile sidebar toggle
         const sidebar = document.getElementById('sidebar');
         document.getElementById('menu-toggle').addEventListener('click', () => sidebar.classList.toggle('open'));
         document.getElementById('sidebar-backdrop').addEventListener('click', () => sidebar.classList.remove('open'));
+        document.getElementById('collapse-btn').addEventListener('click', () => {
+            const c = document.querySelector('.app-container');
+            c.classList.toggle('mini');
+            localStorage.setItem('pui-sidebar', c.classList.contains('mini') ? 'mini' : 'full');
+        });
 
-        // Close modals on backdrop click or Escape
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) this.closeModals(); });
         });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.closeModals(); });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                this.openPalette();
+            } else if (e.key === 'Escape') {
+                this.closePalette();
+                this.closeModals();
+                this.closeDrawer();
+            }
+        });
+
+        const paletteInput = document.getElementById('palette-input');
+        paletteInput.addEventListener('input', () => this.renderPalette());
+        paletteInput.addEventListener('keydown', (e) => {
+            const items = [...document.querySelectorAll('#palette-list li[data-idx]')];
+            if (items.length === 0) return;
+            let sel = items.findIndex(li => li.classList.contains('selected'));
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                sel = e.key === 'ArrowDown' ? (sel + 1) % items.length : (sel - 1 + items.length) % items.length;
+                items.forEach(li => li.classList.remove('selected'));
+                items[sel].classList.add('selected');
+                items[sel].scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                (items[sel] || items[0]).click();
+            }
+        });
+        document.getElementById('palette').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('palette')) this.closePalette();
+        });
     },
 
-    // Animates a stat number from 0 to its final value
+    _titles: {
+        dashboard: 'Dashboard', users: 'Users', lookups: 'Lookups Setup',
+        records: 'Records', export: 'Data Hub',
+    },
+
+    navigate(tabId) {
+        document.querySelectorAll('.nav-links li').forEach(i =>
+            i.classList.toggle('active', i.getAttribute('data-tab') === tabId));
+        document.querySelectorAll('.tab-content').forEach(c =>
+            c.classList.toggle('active', c.id === tabId));
+        document.getElementById('page-title').innerText = this._titles[tabId] || tabId;
+        document.getElementById('crumb').innerText = this._titles[tabId] || tabId;
+        document.getElementById('sidebar').classList.remove('open');
+
+        if (tabId === 'users') this.loadUsers();
+        if (tabId === 'lookups') this.loadLookupTable();
+        if (tabId === 'records') this.loadRecords();
+    },
+
+    // ------------------------------------------------------------
+    // THEME
+    // ------------------------------------------------------------
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('pui-theme', theme);
+        const icon = document.querySelector('#theme-toggle i');
+        if (icon) icon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    },
+
+    toggleTheme() {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        this.applyTheme(next);
+        if (this._analytics) this.renderCharts(this._analytics); // re-render with new palette
+    },
+
+    _cssVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    },
+
+    // ------------------------------------------------------------
+    // DASHBOARD
+    // ------------------------------------------------------------
+    _kpiMeta: {
+        'KitsDistribution': { label: 'Kits Distributed', icon: 'fa-box-open', tint: 'blue' },
+        'AwarenessSessions': { label: 'Awareness Sessions', icon: 'fa-people-group', tint: 'violet' },
+        'MWCounseling': { label: 'MW Counseling', icon: 'fa-clipboard-user', tint: 'amber' },
+        'SRAForm': { label: 'SRA Forms', icon: 'fa-child-reaching', tint: 'rose' },
+        'Users': { label: 'System Users', icon: 'fa-users-gear', tint: 'teal' },
+    },
+
+    async loadDashboard(manual = false) {
+        if (manual) this.showToast('Refreshing dashboard...');
+        this._setHealth(null);
+        await Promise.all([this.loadStats(), this.loadAnalytics()]);
+    },
+
+    _setHealth(ok) {
+        const dot = document.getElementById('health-dot');
+        const label = document.getElementById('health-label');
+        if (ok === null) { dot.className = 'status-indicator'; label.innerText = 'Checking...'; return; }
+        dot.className = 'status-indicator ' + (ok ? 'online' : 'offline');
+        label.innerText = ok ? 'API Online' : 'API Offline';
+    },
+
+    async loadStats() {
+        const container = document.getElementById('stats-container');
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/stats`);
+            const json = await res.json();
+            if (!json.success) throw new Error('stats failed');
+            this._setHealth(true);
+
+            container.innerHTML = '';
+            for (const [table, count] of Object.entries(json.stats)) {
+                const m = this._kpiMeta[table] || { label: table, icon: 'fa-database', tint: 'blue' };
+                const card = document.createElement('div');
+                card.className = 'stat-card';
+                card.innerHTML = `
+                    <div class="stat-top">
+                        <div class="stat-icon ${m.tint}"><i class="fa-solid ${m.icon}"></i></div>
+                        <span class="stat-delta flat" data-delta="${table}"></span>
+                    </div>
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">${m.label}</div>
+                `;
+                container.appendChild(card);
+                this._countUp(card.querySelector('.stat-value'), Number(count) || 0);
+            }
+            this._applyDeltas();
+        } catch (e) {
+            console.error(e);
+            this._setHealth(false);
+            container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+                <i class="fa-solid fa-plug-circle-xmark"></i><p>Could not reach the API. Check the tunnel URL.</p></div>`;
+        }
+    },
+
     _countUp(el, target, duration = 800) {
         const start = performance.now();
         const step = (now) => {
-            const progress = Math.min((now - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            el.innerText = Math.round(target * eased).toLocaleString();
-            if (progress < 1) requestAnimationFrame(step);
+            const p = Math.min((now - start) / duration, 1);
+            el.innerText = Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString();
+            if (p < 1) requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
     },
 
-    async loadStats() {
+    // Month-over-month % change badges, computed from analytics monthly data
+    _applyDeltas() {
+        if (!this._analytics) return;
+        const byTable = {};
+        this._analytics.monthly.forEach(r => {
+            (byTable[r.tableName] = byTable[r.tableName] || {})[r.month] = r.count;
+        });
+        const months = [...new Set(this._analytics.monthly.map(r => r.month))].sort();
+        const [prev, curr] = months.slice(-2);
+        document.querySelectorAll('[data-delta]').forEach(el => {
+            const t = el.getAttribute('data-delta');
+            if (!byTable[t] || !curr) { el.style.display = 'none'; return; }
+            const c = byTable[t][curr] || 0, p = byTable[t][prev] || 0;
+            if (p === 0 && c === 0) { el.style.display = 'none'; return; }
+            const pct = p === 0 ? 100 : Math.round(((c - p) / p) * 100);
+            el.className = 'stat-delta ' + (pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat');
+            el.innerHTML = `<i class="fa-solid fa-arrow-trend-${pct >= 0 ? 'up' : 'down'}"></i> ${Math.abs(pct)}%`;
+        });
+    },
+
+    async loadAnalytics() {
+        const area = document.getElementById('charts-area');
+        const note = document.getElementById('charts-unavailable');
         try {
-            const res = await fetch(`${API_BASE_URL}/api/admin/stats`);
+            const res = await fetch(`${API_BASE_URL}/api/admin/analytics`);
+            if (!res.ok) throw new Error('analytics unavailable');
             const json = await res.json();
-            
-            if (json.success) {
-                const container = document.getElementById('stats-container');
-                container.innerHTML = '';
-
-                const meta = {
-                    'KitsDistribution': { label: 'Kits Distributed', icon: 'fa-box-open', tint: 'blue' },
-                    'AwarenessSessions': { label: 'Awareness Sessions', icon: 'fa-people-group', tint: 'violet' },
-                    'MWCounseling': { label: 'MW Counseling', icon: 'fa-clipboard-user', tint: 'amber' },
-                    'SRAForm': { label: 'SRA Forms', icon: 'fa-child-reaching', tint: 'rose' },
-                    'Users': { label: 'System Users', icon: 'fa-users-gear', tint: 'teal' }
-                };
-
-                for (const [table, count] of Object.entries(json.stats)) {
-                    const m = meta[table] || { label: table, icon: 'fa-database', tint: 'blue' };
-                    const card = document.createElement('div');
-                    card.className = 'stat-card';
-                    card.innerHTML = `
-                        <div class="stat-icon ${m.tint}"><i class="fa-solid ${m.icon}"></i></div>
-                        <div>
-                            <div class="stat-value">0</div>
-                            <div class="stat-label">${m.label}</div>
-                        </div>
-                    `;
-                    container.appendChild(card);
-                    this._countUp(card.querySelector('.stat-value'), Number(count) || 0);
-                }
-            }
+            if (!json.success) throw new Error('analytics failed');
+            this._analytics = json;
+            area.hidden = false;
+            note.hidden = true;
+            this.renderCharts(json);
+            this._applyDeltas();
         } catch (e) {
-            console.error(e);
-            document.getElementById('stats-container').innerHTML = '<div class="text-danger">Failed to load stats</div>';
+            console.warn('Analytics not available:', e.message);
+            area.hidden = true;
+            note.hidden = false;
         }
     },
 
-    // --- USERS ---
+    _charts: {},
+
+    _destroyChart(id) {
+        if (this._charts[id]) { this._charts[id].destroy(); delete this._charts[id]; }
+    },
+
+    renderCharts(data) {
+        if (typeof Chart === 'undefined') return;
+        const text2 = this._cssVar('--text-2');
+        const grid = this._cssVar('--chart-grid');
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = text2;
+
+        const palette = {
+            KitsDistribution: '#0ea5e9',
+            AwarenessSessions: '#8b5cf6',
+            MWCounseling: '#f59e0b',
+            SRAForm: '#f43f5e',
+        };
+
+        // --- Monthly stacked bars ---
+        const months = [...new Set(data.monthly.map(r => r.month))].sort();
+        const monthLabels = months.map(m => {
+            const [y, mo] = m.split('-');
+            return new Date(y, mo - 1).toLocaleString('en', { month: 'short', year: '2-digit' });
+        });
+        const datasets = Object.keys(palette).map(t => ({
+            label: this._kpiMeta[t].label,
+            data: months.map(m => (data.monthly.find(r => r.tableName === t && r.month === m) || {}).count || 0),
+            backgroundColor: palette[t],
+            borderRadius: 6,
+            maxBarThickness: 34,
+        }));
+
+        this._destroyChart('monthly');
+        this._charts.monthly = new Chart(document.getElementById('chart-monthly'), {
+            type: 'bar',
+            data: { labels: monthLabels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyleWidth: 8, boxHeight: 8 } } },
+                scales: {
+                    x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, grid: { color: grid }, border: { display: false }, ticks: { precision: 0 } },
+                },
+            },
+        });
+
+        // --- Gender doughnut ---
+        this._destroyChart('gender');
+        this._charts.gender = new Chart(document.getElementById('chart-gender'), {
+            type: 'doughnut',
+            data: {
+                labels: data.gender.map(g => g.gender),
+                datasets: [{
+                    data: data.gender.map(g => g.count),
+                    backgroundColor: ['#ec4899', '#3b82f6', '#94a3b8', '#f59e0b'],
+                    borderWidth: 0,
+                    hoverOffset: 8,
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '68%',
+                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyleWidth: 8, boxHeight: 8 } } },
+            },
+        });
+
+        // --- Top shelters horizontal bars ---
+        this._destroyChart('shelters');
+        this._charts.shelters = new Chart(document.getElementById('chart-shelters'), {
+            type: 'bar',
+            data: {
+                labels: data.shelters.map(s => s.name),
+                datasets: [{
+                    data: data.shelters.map(s => s.count),
+                    backgroundColor: '#06b6d4',
+                    borderRadius: 6,
+                    maxBarThickness: 22,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: grid }, border: { display: false }, ticks: { precision: 0 } },
+                    y: { grid: { display: false } },
+                },
+            },
+        });
+    },
+
+    // ------------------------------------------------------------
+    // USERS
+    // ------------------------------------------------------------
     async loadUsers() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/admin/users`);
             const json = await res.json();
-            
-            const tbody = document.getElementById('users-table-body');
-            tbody.innerHTML = '';
-            
-            if (json.success && json.data.length > 0) {
-                this._usersData = json.data;
-                json.data.forEach((user, i) => {
-                    const role = user.Role || 'FieldWorker';
-                    const isAdmin = role.toLowerCase() === 'admin';
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><i class="fa-solid fa-circle-user" style="color: var(--text-2); margin-right: 8px;"></i>${user.Username}</td>
-                            <td><span class="badge ${isAdmin ? 'badge-admin' : 'badge-worker'}">
-                                <i class="fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-user'}"></i> ${role}</span></td>
-                            <td>
-                                <div class="row-actions">
-                                    <button class="btn btn-outline btn-sm" onclick="app.editUser(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
-                                    <button class="btn btn-danger btn-sm" onclick="app.deleteUser('${user.Username}')"><i class="fa-solid fa-trash-can"></i> Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                });
-            } else {
-                tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
-                    <i class="fa-solid fa-users-slash"></i><p>No users found. Add your first user to get started.</p></div></td></tr>`;
-            }
+            this._usersData = (json.success && json.data) || [];
+            this.renderUsers();
         } catch (e) {
             console.error(e);
+            document.getElementById('users-table-body').innerHTML =
+                `<tr><td colspan="3"><div class="empty-state"><i class="fa-solid fa-plug-circle-xmark"></i><p>Failed to load users.</p></div></td></tr>`;
         }
+    },
+
+    _avatarColor(name) {
+        const colors = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e', '#06b6d4', '#6366f1'];
+        let h = 0;
+        for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+        return colors[h % colors.length];
+    },
+
+    renderUsers() {
+        const tbody = document.getElementById('users-table-body');
+        const q = (document.getElementById('user-search').value || '').trim().toLowerCase();
+        const users = (this._usersData || []).filter(u => !q || u.Username.toLowerCase().includes(q));
+
+        if (users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
+                <i class="fa-solid fa-users-slash"></i><p>${q ? 'No users match your filter.' : 'No users yet. Add your first user.'}</p></div></td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = users.map(user => {
+            const i = this._usersData.indexOf(user);
+            const role = user.Role || 'FieldWorker';
+            const isAdmin = role.toLowerCase() === 'admin';
+            const initials = user.Username.slice(0, 2).toUpperCase();
+            return `<tr>
+                <td><div class="user-cell">
+                    <span class="avatar" style="background:${this._avatarColor(user.Username)}">${initials}</span>
+                    ${user.Username}</div></td>
+                <td><span class="badge ${isAdmin ? 'badge-admin' : 'badge-worker'}">
+                    <i class="fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-user'}"></i> ${role}</span></td>
+                <td><div class="row-actions">
+                    <button class="btn btn-outline btn-sm" onclick="app.editUser(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="app.deleteUser('${user.Username}')"><i class="fa-solid fa-trash-can"></i></button>
+                </div></td>
+            </tr>`;
+        }).join('');
     },
 
     showUserModal() {
         this._editingUser = null;
+        document.getElementById('user-modal-title').innerText = 'Add User';
         document.getElementById('user-modal').classList.add('show');
         const username = document.getElementById('user-username');
         const password = document.getElementById('user-password');
@@ -149,6 +376,7 @@ const App = {
         const user = this._usersData[index];
         if (!user) return;
         this._editingUser = user.Username;
+        document.getElementById('user-modal-title').innerText = `Edit ${user.Username}`;
         document.getElementById('user-modal').classList.add('show');
         const username = document.getElementById('user-username');
         const password = document.getElementById('user-password');
@@ -175,10 +403,9 @@ const App = {
             const res = await fetch(url, {
                 method: editing ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editing ? { password, role } : { username, password, role })
+                body: JSON.stringify(editing ? { password, role } : { username, password, role }),
             });
             const json = await res.json();
-
             if (json.success) {
                 this.closeModals();
                 this.showToast('User saved successfully');
@@ -188,74 +415,81 @@ const App = {
             }
         } catch (err) {
             console.error(err);
+            this.showToast('Failed to save user', 'error');
         }
     },
 
     async deleteUser(username) {
-        if (!confirm(`Are you sure you want to delete user ${username}?`)) return;
-        
+        const ok = await this.confirmDialog(`Delete user "${username}"? This cannot be undone.`);
+        if (!ok) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/admin/users/${username}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 this.showToast('User deleted');
                 this.loadUsers();
+            } else {
+                this.showToast(json.error || 'Failed to delete user', 'error');
             }
         } catch (e) { console.error(e); }
     },
 
-    // --- LOOKUPS ---
+    // ------------------------------------------------------------
+    // LOOKUPS
+    // ------------------------------------------------------------
+    _lookupTables: ['Projects', 'Shelters', 'DocumentTypes', 'HealthTopics',
+        'KitsTypes', 'TargetCategories', 'CounselingTopics', 'PHCCs', 'Frontliners'],
+    _lookupTable: 'Projects',
+
+    _prettyName(t) { return t.replace(/([a-z])([A-Z])/g, '$1 $2'); },
+
+    renderLookupChips() {
+        document.getElementById('lookup-tabs').innerHTML = this._lookupTables.map(t =>
+            `<button class="chip ${t === this._lookupTable ? 'active' : ''}"
+                onclick="app.selectLookupTable('${t}')">${this._prettyName(t)}</button>`).join('');
+    },
+
+    selectLookupTable(t) {
+        this._lookupTable = t;
+        this.renderLookupChips();
+        this.loadLookupTable();
+    },
+
     async loadLookupTable() {
-        const table = document.getElementById('lookup-table-select').value;
-        
+        const table = this._lookupTable;
+        const tbody = document.getElementById('lookups-table-body');
+        tbody.innerHTML = '<tr><td colspan="2"><div class="skeleton-rows"></div></td></tr>';
         try {
             const res = await fetch(`${API_BASE_URL}/api/admin/lookups/${table}`);
             const json = await res.json();
-            
-            const tbody = document.getElementById('lookups-table-body');
-            tbody.innerHTML = '';
-            
             if (json.success && json.data.length > 0) {
-                // Determine column names dynamically based on first record
                 const keys = Object.keys(json.data[0]);
                 const idCol = keys[0];
-                const nameCol = keys[1] || keys[0]; // Fallback if only 1 column
+                const nameCol = keys[1] || keys[0];
                 this._lookupRows = { idCol, nameCol, data: json.data };
 
-                // Update table head
-                document.getElementById('lookups-table-head').innerHTML = `
-                    <th>${idCol}</th>
-                    <th>${nameCol}</th>
-                    <th>Actions</th>
-                `;
-
-                json.data.forEach((row, i) => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td style="color: var(--text-2); font-size: 0.8rem;">${row[idCol]}</td>
-                            <td style="font-weight: 500;">${row[nameCol]}</td>
-                            <td>
-                                <div class="row-actions">
-                                    <button class="btn btn-outline btn-sm" onclick="app.editLookup(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
-                                    <button class="btn btn-danger btn-sm" onclick="app.deleteLookup('${table}', '${row[idCol]}')"><i class="fa-solid fa-trash-can"></i> Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                });
+                tbody.innerHTML = json.data.map((row, i) => `
+                    <tr>
+                        <td style="font-weight:500;">${row[nameCol]}</td>
+                        <td><div class="row-actions">
+                            <button class="btn btn-outline btn-sm" onclick="app.editLookup(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="app.deleteLookup('${table}', '${row[idCol]}')"><i class="fa-solid fa-trash-can"></i></button>
+                        </div></td>
+                    </tr>`).join('');
             } else {
-                tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
-                    <i class="fa-solid fa-folder-open"></i><p>No records found in ${table}. Add one or import a template.</p></div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="2"><div class="empty-state">
+                    <i class="fa-solid fa-folder-open"></i><p>No records in ${this._prettyName(table)} yet. Add one or import a template.</p></div></td></tr>`;
             }
         } catch (e) {
             console.error(e);
+            tbody.innerHTML = `<tr><td colspan="2"><div class="empty-state">
+                <i class="fa-solid fa-plug-circle-xmark"></i><p>Failed to load ${this._prettyName(table)}.</p></div></td></tr>`;
         }
     },
 
     showLookupModal() {
         this._editingLookupId = null;
-        const table = document.getElementById('lookup-table-select').value;
-        document.getElementById('lookup-modal-title').innerText = `Add ${table}`;
+        document.getElementById('lookup-modal-title').innerText = `Add ${this._prettyName(this._lookupTable)}`;
         document.getElementById('lookup-modal').classList.add('show');
         document.getElementById('lookup-name').value = '';
     },
@@ -264,31 +498,27 @@ const App = {
         const rows = this._lookupRows;
         if (!rows || !rows.data[index]) return;
         const row = rows.data[index];
-        const table = document.getElementById('lookup-table-select').value;
         this._editingLookupId = row[rows.idCol];
-        document.getElementById('lookup-modal-title').innerText = `Edit ${table}`;
+        document.getElementById('lookup-modal-title').innerText = `Edit ${this._prettyName(this._lookupTable)}`;
         document.getElementById('lookup-modal').classList.add('show');
         document.getElementById('lookup-name').value = row[rows.nameCol] || '';
     },
 
     async saveLookup(e) {
         e.preventDefault();
-        const table = document.getElementById('lookup-table-select').value;
+        const table = this._lookupTable;
         const name = document.getElementById('lookup-name').value;
-
         const editingId = this._editingLookupId;
         const url = editingId
             ? `${API_BASE_URL}/api/admin/lookups/${table}/${encodeURIComponent(editingId)}`
             : `${API_BASE_URL}/api/admin/lookups/${table}`;
-
         try {
             const res = await fetch(url, {
                 method: editingId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({ name }),
             });
             const json = await res.json();
-            
             if (json.success) {
                 this.closeModals();
                 this._lookupCache = null; // names changed; records tab will refetch
@@ -299,24 +529,40 @@ const App = {
             }
         } catch (err) {
             console.error(err);
+            this.showToast('Failed to save record', 'error');
         }
     },
 
     async deleteLookup(table, id) {
-        if (!confirm(`Delete record ${id} from ${table}?`)) return;
+        const ok = await this.confirmDialog(`Delete this ${this._prettyName(table)} record? Records referencing it may break.`);
+        if (!ok) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/admin/lookups/${table}/${id}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 this.showToast('Record deleted');
                 this.loadLookupTable();
+            } else {
+                this.showToast(json.error || 'Failed to delete record', 'error');
             }
         } catch (e) { console.error(e); }
     },
 
-    // --- RECORDS BROWSING & EDITING ---
-    // Field metadata per table: how to render the list and the edit form.
-    // 'lookup' values reference the /api/sync/lookups response keys.
+    // ------------------------------------------------------------
+    // RECORDS
+    // ------------------------------------------------------------
+    _recordTables: {
+        KitsDistribution: 'Kits Distribution',
+        KitsDistributionPeopleDetails: 'Household Members',
+        AwarenessSessions: 'Awareness Sessions',
+        MWCounseling: 'MW Counseling',
+        SRAForm: 'SRA Forms',
+    },
+    _recordTable: 'KitsDistribution',
+    _recordPage: 1,
+    _recordSort: null,
+    PAGE_SIZE: 25,
+
     _recordConfigs: {
         KitsDistribution: {
             display: ['DistributionDate', 'Name', 'Gender', 'Nationality', 'KitTypeID', 'ShelterID', 'NumberOfPeopleServed'],
@@ -395,6 +641,21 @@ const App = {
         },
     },
 
+    renderRecordChips() {
+        document.getElementById('record-tabs').innerHTML = Object.entries(this._recordTables).map(([t, label]) =>
+            `<button class="chip ${t === this._recordTable ? 'active' : ''}"
+                onclick="app.selectRecordTable('${t}')">${label}</button>`).join('');
+    },
+
+    selectRecordTable(t) {
+        this._recordTable = t;
+        this._recordPage = 1;
+        this._recordSort = null;
+        document.getElementById('record-search').value = '';
+        this.renderRecordChips();
+        this.loadRecords();
+    },
+
     async _ensureLookupCache() {
         if (this._lookupCache) return this._lookupCache;
         const res = await fetch(`${API_BASE_URL}/api/sync/lookups`);
@@ -420,27 +681,45 @@ const App = {
             if (field.type === 'yesno') return value == 1 ? 'Yes' : 'No';
             if (field.type === 'lookup') return this._lookupNameById[value] || value;
         }
-        // Non-editable reference columns (e.g. DistributionID): shorten UUIDs
         const s = String(value);
         return /^[0-9a-f-]{36}$/i.test(s) ? s.slice(0, 8) + '…' : s;
     },
 
     async loadRecords() {
-        const table = document.getElementById('record-table-select').value;
+        const table = this._recordTable;
         const tbody = document.getElementById('records-table-body');
-        tbody.innerHTML = '<tr><td class="text-center">Loading...</td></tr>';
-
+        tbody.innerHTML = '<tr><td><div class="skeleton-rows"></div></td></tr>';
         try {
             await this._ensureLookupCache();
             const res = await fetch(`${API_BASE_URL}/api/admin/records/${table}`);
             const json = await res.json();
             if (!json.success) throw new Error(json.error || 'Failed to load records');
             this._records = { table, idCol: json.idCol, data: json.data };
+            this._recordPage = 1;
             this.renderRecords();
         } catch (e) {
             console.error(e);
-            tbody.innerHTML = '<tr><td class="text-center text-danger">Failed to load records.</td></tr>';
+            tbody.innerHTML = `<tr><td><div class="empty-state">
+                <i class="fa-solid fa-plug-circle-xmark"></i><p>Failed to load records.</p></div></td></tr>`;
         }
+    },
+
+    onRecordSearch() {
+        this._recordPage = 1;
+        this.renderRecords();
+    },
+
+    sortRecords(col) {
+        const s = this._recordSort;
+        this._recordSort = (s && s.col === col)
+            ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+            : { col, dir: 'asc' };
+        this.renderRecords();
+    },
+
+    changePage(dir) {
+        this._recordPage += dir;
+        this.renderRecords();
     },
 
     renderRecords() {
@@ -448,28 +727,63 @@ const App = {
         if (!records) return;
         const config = this._recordConfigs[records.table];
         const search = (document.getElementById('record-search').value || '').trim().toLowerCase();
+        const sort = this._recordSort;
 
+        // Head with sort arrows
         document.getElementById('records-table-head').innerHTML =
             config.display.map(col => {
                 const field = this._fieldFor(records.table, col);
-                return `<th>${field ? field.label : col}</th>`;
-            }).join('') + '<th>Actions</th>';
+                const label = field ? field.label : col;
+                const arrow = sort && sort.col === col
+                    ? `<span class="sort-arrow"><i class="fa-solid fa-arrow-${sort.dir === 'asc' ? 'up' : 'down'}"></i></span>` : '';
+                return `<th class="sortable" onclick="app.sortRecords('${col}')">${label}${arrow}</th>`;
+            }).join('');
+
+        // Filter
+        let rows = records.data.map((row, i) => ({
+            i,
+            cells: config.display.map(col => this._displayValue(records.table, col, row[col])),
+        }));
+        if (search) {
+            rows = rows.filter(r => r.cells.some(c => String(c).toLowerCase().includes(search)));
+        }
+
+        // Sort
+        if (sort) {
+            const ci = config.display.indexOf(sort.col);
+            const mul = sort.dir === 'asc' ? 1 : -1;
+            rows.sort((a, b) => {
+                const av = a.cells[ci], bv = b.cells[ci];
+                const an = parseFloat(av), bn = parseFloat(bv);
+                if (!isNaN(an) && !isNaN(bn) && String(an) === String(av) && String(bn) === String(bv)) {
+                    return (an - bn) * mul;
+                }
+                return String(av).localeCompare(String(bv)) * mul;
+            });
+        }
+
+        // Paginate
+        const total = rows.length;
+        const pages = Math.max(1, Math.ceil(total / this.PAGE_SIZE));
+        this._recordPage = Math.min(Math.max(1, this._recordPage), pages);
+        const start = (this._recordPage - 1) * this.PAGE_SIZE;
+        const pageRows = rows.slice(start, start + this.PAGE_SIZE);
+
+        document.getElementById('records-count').innerText =
+            `${total.toLocaleString()} record${total === 1 ? '' : 's'}${search ? ' (filtered)' : ''}`;
+        document.getElementById('page-info').innerText = `${this._recordPage} / ${pages}`;
+        document.getElementById('page-prev').disabled = this._recordPage <= 1;
+        document.getElementById('page-next').disabled = this._recordPage >= pages;
 
         const tbody = document.getElementById('records-table-body');
-        const rowsHtml = [];
-        records.data.forEach((row, i) => {
-            const cells = config.display.map(col => this._displayValue(records.table, col, row[col]));
-            if (search && !cells.some(c => String(c).toLowerCase().includes(search))) return;
-            rowsHtml.push(`<tr>${cells.map(c => `<td>${c}</td>`).join('')}
-                <td><button class="btn btn-outline btn-sm" onclick="app.editRecord(${i})"><i class="fa-solid fa-pen"></i> Edit</button></td></tr>`);
-        });
-
-        tbody.innerHTML = rowsHtml.length > 0
-            ? rowsHtml.join('')
-            : `<tr><td colspan="${config.display.length + 1}"><div class="empty-state">
+        tbody.innerHTML = pageRows.length > 0
+            ? pageRows.map(r =>
+                `<tr onclick="app.editRecord(${r.i})">${r.cells.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')
+            : `<tr><td colspan="${config.display.length}"><div class="empty-state">
                 <i class="fa-solid fa-magnifying-glass"></i><p>No matching records found.</p></div></td></tr>`;
     },
 
+    // --- Record editing (drawer) ---
     editRecord(index) {
         const records = this._records;
         const row = records && records.data[index];
@@ -478,7 +792,7 @@ const App = {
         const config = this._recordConfigs[table];
         this._editingRecord = { table, id: row[records.idCol] };
 
-        document.getElementById('record-modal-title').innerText = `Edit ${table} Record`;
+        document.getElementById('drawer-title').innerText = `Edit ${this._recordTables[table] || table}`;
         const container = document.getElementById('record-form-fields');
         container.innerHTML = config.fields.map(f => {
             let input;
@@ -494,7 +808,8 @@ const App = {
             } else {
                 input = `<input type="${f.type}" id="rf-${f.col}">`;
             }
-            return `<div class="form-group"><label>${f.label}</label>${input}</div>`;
+            const full = f.type === 'text' ? ' full' : '';
+            return `<div class="form-group${full}"><label>${f.label}</label>${input}</div>`;
         }).join('');
 
         // Set values programmatically so Arabic text and quotes are safe
@@ -507,7 +822,13 @@ const App = {
             else el.value = value;
         });
 
-        document.getElementById('record-modal').classList.add('show');
+        document.getElementById('drawer').classList.add('show');
+        document.getElementById('drawer-backdrop').classList.add('show');
+    },
+
+    closeDrawer() {
+        document.getElementById('drawer').classList.remove('show');
+        document.getElementById('drawer-backdrop').classList.remove('show');
     },
 
     async saveRecord(e) {
@@ -526,11 +847,11 @@ const App = {
                 `${API_BASE_URL}/api/admin/records/${editing.table}/${encodeURIComponent(editing.id)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
             });
             const json = await res.json();
             if (json.success) {
-                this.closeModals();
+                this.closeDrawer();
                 this.showToast('Record updated successfully');
                 this.loadRecords();
             } else {
@@ -542,28 +863,44 @@ const App = {
         }
     },
 
-    // --- DATA EXPORT ---
+    // ------------------------------------------------------------
+    // DATA HUB (export / templates / import)
+    // ------------------------------------------------------------
+    _exportMeta: [
+        { table: 'KitsDistribution', label: 'Kits Distribution', desc: 'Kits + household members', icon: 'fa-box-open', tint: 'blue' },
+        { table: 'AwarenessSessions', label: 'Awareness Sessions', desc: 'Sessions + health topics', icon: 'fa-people-group', tint: 'violet' },
+        { table: 'MWCounseling', label: 'MW Counseling', desc: 'Counseling + topics', icon: 'fa-clipboard-user', tint: 'amber' },
+        { table: 'SRAForm', label: 'SRA Forms', desc: 'Child assessments', icon: 'fa-child-reaching', tint: 'rose' },
+    ],
+
+    renderExportGrid() {
+        document.getElementById('export-grid').innerHTML = this._exportMeta.map(m => `
+            <div class="export-card">
+                <div class="export-card-top">
+                    <div class="export-icon" style="background:var(--tint-${m.tint}-bg);color:var(--tint-${m.tint}-fg)">
+                        <i class="fa-solid ${m.icon}"></i></div>
+                    <div><h3>${m.label}</h3><small>${m.desc}</small></div>
+                </div>
+                <div class="export-card-actions">
+                    <button class="btn btn-primary" onclick="app.exportData('${m.table}')"><i class="fa-solid fa-download"></i> Export XLSX</button>
+                    <button class="btn btn-outline" onclick="app.downloadTemplate('${m.table}')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                    <button class="btn btn-outline" onclick="app.startImport('${m.table}')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
+                </div>
+            </div>`).join('');
+    },
+
     exportData(table) {
         window.location.href = `${API_BASE_URL}/api/admin/export/${table}`;
         this.showToast(`Downloading ${table}.xlsx...`);
     },
-
-    // --- TEMPLATES & IMPORT ---
-    _lookupTables: ['Projects', 'Shelters', 'DocumentTypes', 'HealthTopics',
-        'KitsTypes', 'TargetCategories', 'CounselingTopics', 'PHCCs', 'Frontliners'],
 
     downloadTemplate(table) {
         window.location.href = `${API_BASE_URL}/api/admin/template/${table}`;
         this.showToast(`Downloading ${table} template...`);
     },
 
-    downloadLookupTemplate() {
-        this.downloadTemplate(document.getElementById('lookup-table-select').value);
-    },
-
-    startLookupImport() {
-        this.startImport(document.getElementById('lookup-table-select').value);
-    },
+    downloadLookupTemplate() { this.downloadTemplate(this._lookupTable); },
+    startLookupImport() { this.startImport(this._lookupTable); },
 
     startImport(table) {
         this._importTable = table;
@@ -585,13 +922,12 @@ const App = {
             const res = await fetch(`${API_BASE_URL}/api/admin/import/${this._importTable}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream' },
-                body: file
+                body: file,
             });
             const json = await res.json();
 
             if (json.success) {
-                const skipped = json.skipped
-                    ? ` (${json.skipped} already existing, skipped)` : '';
+                const skipped = json.skipped ? ` (${json.skipped} already existing, skipped)` : '';
                 resultBox.innerHTML = `<div class="alert alert-success">
                     <i class="fa-solid fa-circle-check"></i>
                     Imported ${json.imported} record(s) into ${this._importTable} successfully${skipped}.</div>`;
@@ -616,23 +952,96 @@ const App = {
         }
     },
 
-    // --- UTILS ---
+    // ------------------------------------------------------------
+    // CONFIRM DIALOG
+    // ------------------------------------------------------------
+    confirmDialog(message) {
+        document.getElementById('confirm-message').innerText = message;
+        document.getElementById('confirm-modal').classList.add('show');
+        return new Promise(resolve => { this._confirmResolve = resolve; });
+    },
+
+    resolveConfirm(answer) {
+        document.getElementById('confirm-modal').classList.remove('show');
+        if (this._confirmResolve) { this._confirmResolve(answer); this._confirmResolve = null; }
+    },
+
+    // ------------------------------------------------------------
+    // COMMAND PALETTE
+    // ------------------------------------------------------------
+    _paletteActions() {
+        const nav = Object.entries(this._titles).map(([tab, label]) => ({
+            icon: 'fa-location-arrow', label: `Go to ${label}`, hint: 'Navigate',
+            run: () => this.navigate(tab),
+        }));
+        const data = this._exportMeta.flatMap(m => ([
+            { icon: 'fa-download', label: `Export ${m.label}`, hint: 'XLSX', run: () => this.exportData(m.table) },
+            { icon: 'fa-file-arrow-down', label: `Download ${m.label} template`, hint: 'XLSX', run: () => this.downloadTemplate(m.table) },
+            { icon: 'fa-file-arrow-up', label: `Import ${m.label}`, hint: 'Upload', run: () => this.startImport(m.table) },
+        ]));
+        return [
+            ...nav,
+            { icon: 'fa-user-plus', label: 'Add new user', hint: 'Users', run: () => { this.navigate('users'); this.showUserModal(); } },
+            { icon: 'fa-plus', label: 'Add lookup record', hint: 'Lookups', run: () => { this.navigate('lookups'); this.showLookupModal(); } },
+            { icon: 'fa-rotate', label: 'Refresh dashboard', hint: 'Dashboard', run: () => { this.navigate('dashboard'); this.loadDashboard(true); } },
+            { icon: 'fa-circle-half-stroke', label: 'Toggle dark / light theme', hint: 'Theme', run: () => this.toggleTheme() },
+            ...data,
+        ];
+    },
+
+    openPalette() {
+        document.getElementById('palette').classList.add('show');
+        const input = document.getElementById('palette-input');
+        input.value = '';
+        this.renderPalette();
+        setTimeout(() => input.focus(), 50);
+    },
+
+    closePalette() {
+        document.getElementById('palette').classList.remove('show');
+    },
+
+    renderPalette() {
+        const q = (document.getElementById('palette-input').value || '').trim().toLowerCase();
+        this._paletteFiltered = this._paletteActions().filter(a => !q || a.label.toLowerCase().includes(q));
+        const list = document.getElementById('palette-list');
+        if (this._paletteFiltered.length === 0) {
+            list.innerHTML = '<div class="palette-empty">No matching commands.</div>';
+            return;
+        }
+        list.innerHTML = this._paletteFiltered.map((a, i) => `
+            <li data-idx="${i}" class="${i === 0 ? 'selected' : ''}" onclick="app.runPaletteAction(${i})">
+                <i class="fa-solid ${a.icon}"></i> ${a.label} <small>${a.hint}</small>
+            </li>`).join('');
+    },
+
+    runPaletteAction(i) {
+        const action = this._paletteFiltered[i];
+        this.closePalette();
+        if (action) action.run();
+    },
+
+    // ------------------------------------------------------------
+    // UTILS
+    // ------------------------------------------------------------
     closeModals() {
         document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
+        if (this._confirmResolve) { this._confirmResolve(false); this._confirmResolve = null; }
     },
 
     showToast(msg, type = 'success') {
-        const toast = document.getElementById('toast');
-        const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check';
+        const stack = document.getElementById('toast-stack');
+        const toast = document.createElement('div');
         toast.className = `toast ${type}`;
+        const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check';
         toast.innerHTML = `<i class="fa-solid ${icon}"></i><span></span>`;
         toast.querySelector('span').innerText = msg;
-        // Force a reflow so the transition replays on back-to-back toasts
-        void toast.offsetWidth;
-        toast.classList.add('show');
-        clearTimeout(this._toastTimer);
-        this._toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
-    }
+        stack.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('leaving');
+            setTimeout(() => toast.remove(), 350);
+        }, 3200);
+    },
 };
 
 window.app = App;

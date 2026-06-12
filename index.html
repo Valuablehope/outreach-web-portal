@@ -1,220 +1,214 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUI Outreach Admin</title>
-    <!-- Use Outfit and Inter fonts like the Flutter app -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome for Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=5">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 
     <div class="app-container">
-        <!-- Sidebar Navigation -->
+        <!-- Sidebar -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo-badge"><i class="fa-solid fa-earth-americas"></i></div>
-                <div>
+                <div class="logo-text">
                     <h2>PUI Admin</h2>
                     <small>Outreach Platform</small>
                 </div>
             </div>
             <ul class="nav-links">
-                <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</li>
-                <li data-tab="users"><i class="fa-solid fa-users-gear"></i> Users</li>
-                <li data-tab="lookups"><i class="fa-solid fa-list-check"></i> Lookups Setup</li>
-                <li data-tab="records"><i class="fa-solid fa-table-list"></i> Records</li>
-                <li data-tab="export"><i class="fa-solid fa-file-export"></i> Data Export</li>
+                <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i><span>Dashboard</span></li>
+                <li data-tab="users"><i class="fa-solid fa-users-gear"></i><span>Users</span></li>
+                <li data-tab="lookups"><i class="fa-solid fa-list-check"></i><span>Lookups Setup</span></li>
+                <li data-tab="records"><i class="fa-solid fa-table-list"></i><span>Records</span></li>
+                <li data-tab="export"><i class="fa-solid fa-file-export"></i><span>Data Hub</span></li>
             </ul>
             <div class="sidebar-footer">
-                <i class="fa-solid fa-shield-halved"></i> Secure Admin Console
+                <button class="collapse-btn" id="collapse-btn" title="Collapse sidebar">
+                    <i class="fa-solid fa-angles-left"></i><span>Collapse</span>
+                </button>
             </div>
         </nav>
         <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
-        <!-- Main Content -->
+        <!-- Main -->
         <main class="main-content">
-            <!-- Header -->
             <header class="top-header">
                 <div class="header-left">
-                    <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu"><i class="fa-solid fa-bars"></i></button>
-                    <h1 id="page-title">Dashboard</h1>
+                    <button class="icon-btn menu-toggle" id="menu-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+                    <div>
+                        <div class="breadcrumb"><span>PUI Outreach</span> <i class="fa-solid fa-chevron-right"></i> <span id="crumb">Dashboard</span></div>
+                        <h1 id="page-title">Dashboard</h1>
+                    </div>
                 </div>
-                <div class="user-profile">
-                    <span class="status-indicator online"></span>
-                    <span>Admin Mode</span>
+                <div class="header-right">
+                    <button class="palette-btn" onclick="app.openPalette()">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span>Quick actions...</span>
+                        <kbd>Ctrl K</kbd>
+                    </button>
+                    <button class="icon-btn" id="theme-toggle" onclick="app.toggleTheme()" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+                    <div class="user-profile" id="health-chip">
+                        <span class="status-indicator" id="health-dot"></span>
+                        <span id="health-label">Checking...</span>
+                    </div>
                 </div>
             </header>
 
-            <!-- Dashboard Tab -->
+            <!-- Dashboard -->
             <section id="dashboard" class="tab-content active">
-                <div class="glass-card welcome-card">
-                    <h2>Platform Overview</h2>
-                    <p>Welcome to the Administrative Panel. View synchronized records across your entire platform, manage field workers and keep your lookup data up to date.</p>
+                <div class="hero-card">
+                    <div>
+                        <h2>Platform Overview</h2>
+                        <p>Live view of synchronized field data — kits, sessions, counseling and assessments across all shelters.</p>
+                    </div>
+                    <button class="btn btn-glass" onclick="app.loadDashboard(true)"><i class="fa-solid fa-rotate"></i> Refresh</button>
                 </div>
 
                 <div class="stats-grid" id="stats-container">
-                    <!-- Stats cards injected via JS -->
-                    <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading stats...</div>
+                    <div class="kpi-skeleton"></div><div class="kpi-skeleton"></div>
+                    <div class="kpi-skeleton"></div><div class="kpi-skeleton"></div><div class="kpi-skeleton"></div>
+                </div>
+
+                <div id="charts-area" class="charts-grid" hidden>
+                    <div class="panel chart-wide">
+                        <div class="panel-head">
+                            <h3><i class="fa-solid fa-wave-square"></i> Activity — last 12 months</h3>
+                        </div>
+                        <div class="chart-box"><canvas id="chart-monthly"></canvas></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3><i class="fa-solid fa-venus-mars"></i> Gender split</h3></div>
+                        <div class="chart-box"><canvas id="chart-gender"></canvas></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3><i class="fa-solid fa-house-flag"></i> Top shelters</h3></div>
+                        <div class="chart-box"><canvas id="chart-shelters"></canvas></div>
+                    </div>
+                </div>
+                <div id="charts-unavailable" class="hint" hidden>
+                    <i class="fa-solid fa-circle-info"></i> Charts will appear once the backend is updated with the analytics endpoint.
                 </div>
             </section>
 
-            <!-- Users Tab -->
+            <!-- Users -->
             <section id="users" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>Manage Field Workers</h2>
-                        <div class="header-actions">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3><i class="fa-solid fa-users-gear"></i> Field Workers &amp; Admins</h3>
+                        <div class="head-actions">
+                            <div class="search-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="user-search" class="search-input" placeholder="Filter users..." oninput="app.renderUsers()">
+                            </div>
                             <button class="btn btn-primary" onclick="app.showUserModal()"><i class="fa-solid fa-plus"></i> Add User</button>
                         </div>
                     </div>
                     <div class="table-container">
                         <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Role</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body">
-                                <tr><td colspan="3" class="text-center">Loading...</td></tr>
-                            </tbody>
+                            <thead><tr><th>User</th><th>Role</th><th class="th-actions">Actions</th></tr></thead>
+                            <tbody id="users-table-body"><tr><td colspan="3"><div class="skeleton-rows"></div></td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </section>
 
-            <!-- Lookups Tab -->
+            <!-- Lookups -->
             <section id="lookups" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>Manage Platform Data</h2>
-                        <div class="header-actions">
-                            <div class="dropdown-container">
-                                <select id="lookup-table-select" onchange="app.loadLookupTable()">
-                                    <option value="Projects">Projects</option>
-                                    <option value="Shelters">Shelters</option>
-                                    <option value="DocumentTypes">Document Types</option>
-                                    <option value="HealthTopics">Health Topics</option>
-                                    <option value="KitsTypes">Kits Types</option>
-                                    <option value="TargetCategories">Target Categories</option>
-                                    <option value="CounselingTopics">Counseling Topics</option>
-                                    <option value="PHCCs">PHCCs</option>
-                                    <option value="Frontliners">Frontliners</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" onclick="app.showLookupModal()"><i class="fa-solid fa-plus"></i> Add Record</button>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3><i class="fa-solid fa-list-check"></i> Platform Data</h3>
+                        <div class="head-actions">
+                            <button class="btn btn-primary" onclick="app.showLookupModal()"><i class="fa-solid fa-plus"></i> Add</button>
                             <button class="btn btn-outline" onclick="app.downloadLookupTemplate()"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
                             <button class="btn btn-outline" onclick="app.startLookupImport()"><i class="fa-solid fa-file-arrow-up"></i> Import</button>
                         </div>
                     </div>
+                    <div class="chip-row" id="lookup-tabs"></div>
                     <div id="lookup-import-result"></div>
                     <div class="table-container">
                         <table class="data-table">
-                            <thead>
-                                <tr id="lookups-table-head">
-                                    <th>ID</th>
-                                    <th>Name</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="lookups-table-body">
-                                <tr><td colspan="3" class="text-center">Loading...</td></tr>
-                            </tbody>
+                            <thead><tr><th>Name</th><th class="th-actions">Actions</th></tr></thead>
+                            <tbody id="lookups-table-body"><tr><td colspan="2"><div class="skeleton-rows"></div></td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </section>
 
-            <!-- Records Tab -->
+            <!-- Records -->
             <section id="records" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>Browse &amp; Edit Records</h2>
-                        <div class="header-actions">
-                            <div class="dropdown-container">
-                                <select id="record-table-select" onchange="app.loadRecords()">
-                                    <option value="KitsDistribution">Kits Distribution</option>
-                                    <option value="KitsDistributionPeopleDetails">Kits — Household Members</option>
-                                    <option value="AwarenessSessions">Awareness Sessions</option>
-                                    <option value="MWCounseling">MW Counseling</option>
-                                    <option value="SRAForm">SRA Forms</option>
-                                </select>
-                            </div>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3><i class="fa-solid fa-table-list"></i> Browse &amp; Edit Records</h3>
+                        <div class="head-actions">
                             <div class="search-wrap">
                                 <i class="fa-solid fa-magnifying-glass"></i>
-                                <input type="text" id="record-search" class="search-input" placeholder="Search records..."
-                                       oninput="app.renderRecords()">
+                                <input type="text" id="record-search" class="search-input" placeholder="Search records..." oninput="app.onRecordSearch()">
                             </div>
                         </div>
                     </div>
-                    <p class="hint"><i class="fa-solid fa-circle-info"></i> Showing the latest 200 records. Use search to narrow down, then click Edit.</p>
+                    <div class="chip-row" id="record-tabs"></div>
+                    <p class="hint"><i class="fa-solid fa-circle-info"></i> Latest 200 records per table. Click a column to sort, click a row to edit.</p>
                     <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr id="records-table-head"></tr>
-                            </thead>
-                            <tbody id="records-table-body">
-                                <tr><td class="text-center">Loading...</td></tr>
-                            </tbody>
+                        <table class="data-table clickable">
+                            <thead><tr id="records-table-head"></tr></thead>
+                            <tbody id="records-table-body"><tr><td><div class="skeleton-rows"></div></td></tr></tbody>
                         </table>
+                    </div>
+                    <div class="table-footer">
+                        <span id="records-count"></span>
+                        <div class="pager">
+                            <button class="icon-btn" id="page-prev" onclick="app.changePage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span id="page-info"></span>
+                            <button class="icon-btn" id="page-next" onclick="app.changePage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Export Tab -->
+            <!-- Data Hub (export/import) -->
             <section id="export" class="tab-content">
-                <div class="glass-card">
-                    <h2>Data Extraction (.XLSX)</h2>
-                    <p class="mb-4">Download the full synchronized datasets for analysis in Microsoft Excel, or download a fillable template and import data in bulk.</p>
-
-                    <div class="export-grid">
-                        <div class="export-card">
-                            <div class="export-icon" style="background: var(--tint-blue-bg); color: var(--tint-blue-fg);"><i class="fa-solid fa-box-open"></i></div>
-                            <h3>Kits Distribution</h3>
-                            <button class="btn btn-primary" onclick="app.exportData('KitsDistribution')"><i class="fa-solid fa-download"></i> Export XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('KitsDistribution')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('KitsDistribution')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
-                        </div>
-                        <div class="export-card">
-                            <div class="export-icon" style="background: var(--tint-violet-bg); color: var(--tint-violet-fg);"><i class="fa-solid fa-people-group"></i></div>
-                            <h3>Awareness Sessions</h3>
-                            <button class="btn btn-primary" onclick="app.exportData('AwarenessSessions')"><i class="fa-solid fa-download"></i> Export XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('AwarenessSessions')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('AwarenessSessions')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
-                        </div>
-                        <div class="export-card">
-                            <div class="export-icon" style="background: var(--tint-amber-bg); color: var(--tint-amber-fg);"><i class="fa-solid fa-clipboard-user"></i></div>
-                            <h3>MW Counseling</h3>
-                            <button class="btn btn-primary" onclick="app.exportData('MWCounseling')"><i class="fa-solid fa-download"></i> Export XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('MWCounseling')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('MWCounseling')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
-                        </div>
-                        <div class="export-card">
-                            <div class="export-icon" style="background: var(--tint-rose-bg); color: var(--tint-rose-fg);"><i class="fa-solid fa-child-reaching"></i></div>
-                            <h3>SRA Forms</h3>
-                            <button class="btn btn-primary" onclick="app.exportData('SRAForm')"><i class="fa-solid fa-download"></i> Export XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('SRAForm')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('SRAForm')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
-                        </div>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3><i class="fa-solid fa-file-export"></i> Data Hub</h3>
                     </div>
-                    <input type="file" id="import-file-input" accept=".xlsx" style="display: none"
-                           onchange="app.handleImportFile(event)">
+                    <p class="hint"><i class="fa-solid fa-circle-info"></i> Export full datasets to Excel, or download a fillable template and bulk-import data.</p>
+                    <div class="export-grid" id="export-grid"></div>
+                    <input type="file" id="import-file-input" accept=".xlsx" style="display:none" onchange="app.handleImportFile(event)">
                     <div id="import-result" class="mt-4"></div>
                 </div>
             </section>
         </main>
     </div>
 
+    <!-- Edit drawer -->
+    <div class="drawer-backdrop" id="drawer-backdrop" onclick="app.closeDrawer()"></div>
+    <aside class="drawer" id="drawer">
+        <div class="drawer-head">
+            <h2 id="drawer-title">Edit Record</h2>
+            <button class="icon-btn" onclick="app.closeDrawer()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="record-form" onsubmit="app.saveRecord(event)">
+            <div id="record-form-fields" class="drawer-body"></div>
+            <div class="drawer-foot">
+                <button type="button" class="btn btn-outline" onclick="app.closeDrawer()">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+            </div>
+        </form>
+    </aside>
+
     <!-- Modals -->
     <div id="user-modal" class="modal">
-        <div class="modal-content glass-card">
-            <span class="close-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></span>
-            <h2>Add / Edit User</h2>
+        <div class="modal-content">
+            <div class="modal-head">
+                <h2 id="user-modal-title">Add User</h2>
+                <button class="icon-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
             <form id="user-form" onsubmit="app.saveUser(event)">
                 <div class="form-group">
                     <label>Username</label>
@@ -237,9 +231,11 @@
     </div>
 
     <div id="lookup-modal" class="modal">
-        <div class="modal-content glass-card">
-            <span class="close-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></span>
-            <h2 id="lookup-modal-title">Add Record</h2>
+        <div class="modal-content">
+            <div class="modal-head">
+                <h2 id="lookup-modal-title">Add Record</h2>
+                <button class="icon-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
             <form id="lookup-form" onsubmit="app.saveLookup(event)">
                 <div class="form-group">
                     <label>Name</label>
@@ -250,20 +246,34 @@
         </div>
     </div>
 
-    <div id="record-modal" class="modal">
-        <div class="modal-content glass-card" style="max-height: 85vh; overflow-y: auto;">
-            <span class="close-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></span>
-            <h2 id="record-modal-title">Edit Record</h2>
-            <form id="record-form" onsubmit="app.saveRecord(event)">
-                <div id="record-form-fields"></div>
-                <button type="submit" class="btn btn-primary w-100 mt-3"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
-            </form>
+    <!-- Confirm dialog -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h2 id="confirm-title">Are you sure?</h2>
+            <p id="confirm-message" class="confirm-message"></p>
+            <div class="confirm-actions">
+                <button class="btn btn-outline" onclick="app.resolveConfirm(false)">Cancel</button>
+                <button class="btn btn-delete" id="confirm-yes" onclick="app.resolveConfirm(true)">Delete</button>
+            </div>
         </div>
     </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast">Message here</div>
+    <!-- Command palette -->
+    <div id="palette" class="palette-overlay">
+        <div class="palette-box">
+            <div class="palette-input-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="palette-input" placeholder="Type a command or search..." autocomplete="off">
+                <kbd>Esc</kbd>
+            </div>
+            <ul class="palette-list" id="palette-list"></ul>
+        </div>
+    </div>
 
-    <script src="app.js?v=5"></script>
+    <!-- Toast stack -->
+    <div id="toast-stack" class="toast-stack"></div>
+
+    <script src="app.js?v=6"></script>
 </body>
 </html>
