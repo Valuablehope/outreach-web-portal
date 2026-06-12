@@ -15,21 +15,47 @@ const App = {
                 // Remove active from all
                 document.querySelectorAll('.nav-links li').forEach(i => i.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                
+
                 // Add active to current
                 e.currentTarget.classList.add('active');
                 const tabId = e.currentTarget.getAttribute('data-tab');
                 document.getElementById(tabId).classList.add('active');
-                
+
                 // Update page title
                 document.getElementById('page-title').innerText = e.currentTarget.innerText;
-                
+
+                // Close the sidebar on mobile after navigating
+                document.getElementById('sidebar').classList.remove('open');
+
                 // Load tab data if needed
                 if (tabId === 'users') this.loadUsers();
                 if (tabId === 'lookups') this.loadLookupTable();
                 if (tabId === 'records') this.loadRecords();
             });
         });
+
+        // Mobile sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        document.getElementById('menu-toggle').addEventListener('click', () => sidebar.classList.toggle('open'));
+        document.getElementById('sidebar-backdrop').addEventListener('click', () => sidebar.classList.remove('open'));
+
+        // Close modals on backdrop click or Escape
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => { if (e.target === modal) this.closeModals(); });
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.closeModals(); });
+    },
+
+    // Animates a stat number from 0 to its final value
+    _countUp(el, target, duration = 800) {
+        const start = performance.now();
+        const step = (now) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.innerText = Math.round(target * eased).toLocaleString();
+            if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
     },
 
     async loadStats() {
@@ -40,22 +66,28 @@ const App = {
             if (json.success) {
                 const container = document.getElementById('stats-container');
                 container.innerHTML = '';
-                
-                const labels = {
-                    'KitsDistribution': 'Kits Distributed',
-                    'AwarenessSessions': 'Awareness Sessions',
-                    'MWCounseling': 'MW Counseling',
-                    'SRAForm': 'SRA Forms',
-                    'Users': 'System Users'
+
+                const meta = {
+                    'KitsDistribution': { label: 'Kits Distributed', icon: 'fa-box-open', tint: 'blue' },
+                    'AwarenessSessions': { label: 'Awareness Sessions', icon: 'fa-people-group', tint: 'violet' },
+                    'MWCounseling': { label: 'MW Counseling', icon: 'fa-clipboard-user', tint: 'amber' },
+                    'SRAForm': { label: 'SRA Forms', icon: 'fa-child-reaching', tint: 'rose' },
+                    'Users': { label: 'System Users', icon: 'fa-users-gear', tint: 'teal' }
                 };
-                
+
                 for (const [table, count] of Object.entries(json.stats)) {
-                    container.innerHTML += `
-                        <div class="stat-card">
-                            <div class="stat-value">${count}</div>
-                            <div class="stat-label">${labels[table] || table}</div>
+                    const m = meta[table] || { label: table, icon: 'fa-database', tint: 'blue' };
+                    const card = document.createElement('div');
+                    card.className = 'stat-card';
+                    card.innerHTML = `
+                        <div class="stat-icon ${m.tint}"><i class="fa-solid ${m.icon}"></i></div>
+                        <div>
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">${m.label}</div>
                         </div>
                     `;
+                    container.appendChild(card);
+                    this._countUp(card.querySelector('.stat-value'), Number(count) || 0);
                 }
             }
         } catch (e) {
@@ -76,19 +108,25 @@ const App = {
             if (json.success && json.data.length > 0) {
                 this._usersData = json.data;
                 json.data.forEach((user, i) => {
+                    const role = user.Role || 'FieldWorker';
+                    const isAdmin = role.toLowerCase() === 'admin';
                     tbody.innerHTML += `
                         <tr>
-                            <td>${user.Username}</td>
-                            <td><span style="background: rgba(0, 229, 255, 0.2); color: var(--accent); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${user.Role || 'FieldWorker'}</span></td>
+                            <td><i class="fa-solid fa-circle-user" style="color: var(--text-2); margin-right: 8px;"></i>${user.Username}</td>
+                            <td><span class="badge ${isAdmin ? 'badge-admin' : 'badge-worker'}">
+                                <i class="fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-user'}"></i> ${role}</span></td>
                             <td>
-                                <button class="btn btn-outline" onclick="app.editUser(${i})">Edit</button>
-                                <button class="btn btn-danger" onclick="app.deleteUser('${user.Username}')">Delete</button>
+                                <div class="row-actions">
+                                    <button class="btn btn-outline btn-sm" onclick="app.editUser(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="app.deleteUser('${user.Username}')"><i class="fa-solid fa-trash-can"></i> Delete</button>
+                                </div>
                             </td>
                         </tr>
                     `;
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center">No users found.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
+                    <i class="fa-solid fa-users-slash"></i><p>No users found. Add your first user to get started.</p></div></td></tr>`;
             }
         } catch (e) {
             console.error(e);
@@ -146,7 +184,7 @@ const App = {
                 this.showToast('User saved successfully');
                 this.loadUsers();
             } else {
-                this.showToast(json.error || 'Failed to save user');
+                this.showToast(json.error || 'Failed to save user', 'error');
             }
         } catch (err) {
             console.error(err);
@@ -194,17 +232,20 @@ const App = {
                 json.data.forEach((row, i) => {
                     tbody.innerHTML += `
                         <tr>
-                            <td>${row[idCol]}</td>
-                            <td>${row[nameCol]}</td>
+                            <td style="color: var(--text-2); font-size: 0.8rem;">${row[idCol]}</td>
+                            <td style="font-weight: 500;">${row[nameCol]}</td>
                             <td>
-                                <button class="btn btn-outline" onclick="app.editLookup(${i})">Edit</button>
-                                <button class="btn btn-danger" onclick="app.deleteLookup('${table}', '${row[idCol]}')">Delete</button>
+                                <div class="row-actions">
+                                    <button class="btn btn-outline btn-sm" onclick="app.editLookup(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="app.deleteLookup('${table}', '${row[idCol]}')"><i class="fa-solid fa-trash-can"></i> Delete</button>
+                                </div>
                             </td>
                         </tr>
                     `;
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center">No records found.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
+                    <i class="fa-solid fa-folder-open"></i><p>No records found in ${table}. Add one or import a template.</p></div></td></tr>`;
             }
         } catch (e) {
             console.error(e);
@@ -254,7 +295,7 @@ const App = {
                 this.showToast('Record saved successfully');
                 this.loadLookupTable();
             } else {
-                this.showToast(json.error || 'Failed to save record');
+                this.showToast(json.error || 'Failed to save record', 'error');
             }
         } catch (err) {
             console.error(err);
@@ -420,12 +461,13 @@ const App = {
             const cells = config.display.map(col => this._displayValue(records.table, col, row[col]));
             if (search && !cells.some(c => String(c).toLowerCase().includes(search))) return;
             rowsHtml.push(`<tr>${cells.map(c => `<td>${c}</td>`).join('')}
-                <td><button class="btn btn-outline" onclick="app.editRecord(${i})">Edit</button></td></tr>`);
+                <td><button class="btn btn-outline btn-sm" onclick="app.editRecord(${i})"><i class="fa-solid fa-pen"></i> Edit</button></td></tr>`);
         });
 
         tbody.innerHTML = rowsHtml.length > 0
             ? rowsHtml.join('')
-            : `<tr><td colspan="${config.display.length + 1}" class="text-center">No records found.</td></tr>`;
+            : `<tr><td colspan="${config.display.length + 1}"><div class="empty-state">
+                <i class="fa-solid fa-magnifying-glass"></i><p>No matching records found.</p></div></td></tr>`;
     },
 
     editRecord(index) {
@@ -492,11 +534,11 @@ const App = {
                 this.showToast('Record updated successfully');
                 this.loadRecords();
             } else {
-                this.showToast(json.error || 'Failed to update record');
+                this.showToast(json.error || 'Failed to update record', 'error');
             }
         } catch (err) {
             console.error(err);
-            this.showToast('Failed to update record');
+            this.showToast('Failed to update record', 'error');
         }
     },
 
@@ -536,7 +578,7 @@ const App = {
 
         const isLookup = this._lookupTables.includes(this._importTable);
         const resultBox = document.getElementById(isLookup ? 'lookup-import-result' : 'import-result');
-        resultBox.innerHTML = '<p>Uploading and validating, please wait...</p>';
+        resultBox.innerHTML = '<p class="hint"><i class="fa-solid fa-circle-notch fa-spin"></i> Uploading and validating, please wait...</p>';
         this.showToast(`Importing ${file.name}...`);
 
         try {
@@ -550,9 +592,9 @@ const App = {
             if (json.success) {
                 const skipped = json.skipped
                     ? ` (${json.skipped} already existing, skipped)` : '';
-                resultBox.innerHTML = `<p style="color: #4caf50;">
+                resultBox.innerHTML = `<div class="alert alert-success">
                     <i class="fa-solid fa-circle-check"></i>
-                    Imported ${json.imported} record(s) into ${this._importTable} successfully${skipped}.</p>`;
+                    Imported ${json.imported} record(s) into ${this._importTable} successfully${skipped}.</div>`;
                 this.showToast('Import successful');
                 this.loadStats();
                 if (isLookup) this.loadLookupTable();
@@ -561,16 +603,16 @@ const App = {
                     .map(err => `<li>${err}</li>`).join('');
                 const more = (json.errors || []).length > 25
                     ? `<p>...and ${json.errors.length - 25} more error(s).</p>` : '';
-                resultBox.innerHTML = `<div style="color: #ff5252;">
-                    <p><i class="fa-solid fa-circle-xmark"></i>
-                    Nothing was imported. Please fix the following and upload again:</p>
+                resultBox.innerHTML = `<div class="alert alert-error">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                    Nothing was imported. Please fix the following and upload again:
                     <ul>${items}</ul>${more}</div>`;
-                this.showToast('Import failed — see details below');
+                this.showToast('Import failed — see details below', 'error');
             }
         } catch (err) {
             console.error(err);
-            resultBox.innerHTML = '<p style="color: #ff5252;">Upload failed. Check your connection and try again.</p>';
-            this.showToast('Import failed');
+            resultBox.innerHTML = '<div class="alert alert-error">Upload failed. Check your connection and try again.</div>';
+            this.showToast('Import failed', 'error');
         }
     },
 
@@ -579,11 +621,17 @@ const App = {
         document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
     },
 
-    showToast(msg) {
+    showToast(msg, type = 'success') {
         const toast = document.getElementById('toast');
-        toast.innerText = msg;
+        const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check';
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<i class="fa-solid ${icon}"></i><span></span>`;
+        toast.querySelector('span').innerText = msg;
+        // Force a reflow so the transition replays on back-to-back toasts
+        void toast.offsetWidth;
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
     }
 };
 

@@ -8,16 +8,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
     <div class="app-container">
         <!-- Sidebar Navigation -->
-        <nav class="sidebar">
+        <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <i class="fa-solid fa-earth-americas logo-icon"></i>
-                <h2>PUI Admin</h2>
+                <div class="logo-badge"><i class="fa-solid fa-earth-americas"></i></div>
+                <div>
+                    <h2>PUI Admin</h2>
+                    <small>Outreach Platform</small>
+                </div>
             </div>
             <ul class="nav-links">
                 <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</li>
@@ -26,13 +29,20 @@
                 <li data-tab="records"><i class="fa-solid fa-table-list"></i> Records</li>
                 <li data-tab="export"><i class="fa-solid fa-file-export"></i> Data Export</li>
             </ul>
+            <div class="sidebar-footer">
+                <i class="fa-solid fa-shield-halved"></i> Secure Admin Console
+            </div>
         </nav>
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
         <!-- Main Content -->
         <main class="main-content">
             <!-- Header -->
             <header class="top-header">
-                <h1 id="page-title">Dashboard</h1>
+                <div class="header-left">
+                    <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu"><i class="fa-solid fa-bars"></i></button>
+                    <h1 id="page-title">Dashboard</h1>
+                </div>
                 <div class="user-profile">
                     <span class="status-indicator online"></span>
                     <span>Admin Mode</span>
@@ -43,9 +53,9 @@
             <section id="dashboard" class="tab-content active">
                 <div class="glass-card welcome-card">
                     <h2>Platform Overview</h2>
-                    <p>Welcome to the Administrative Panel. View synchronized records across your entire platform.</p>
+                    <p>Welcome to the Administrative Panel. View synchronized records across your entire platform, manage field workers and keep your lookup data up to date.</p>
                 </div>
-                
+
                 <div class="stats-grid" id="stats-container">
                     <!-- Stats cards injected via JS -->
                     <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading stats...</div>
@@ -57,7 +67,9 @@
                 <div class="glass-card">
                     <div class="card-header">
                         <h2>Manage Field Workers</h2>
-                        <button class="btn btn-primary" onclick="app.showUserModal()"><i class="fa-solid fa-plus"></i> Add User</button>
+                        <div class="header-actions">
+                            <button class="btn btn-primary" onclick="app.showUserModal()"><i class="fa-solid fa-plus"></i> Add User</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table class="data-table">
@@ -81,22 +93,24 @@
                 <div class="glass-card">
                     <div class="card-header">
                         <h2>Manage Platform Data</h2>
-                        <div class="dropdown-container">
-                            <select id="lookup-table-select" onchange="app.loadLookupTable()">
-                                <option value="Projects">Projects</option>
-                                <option value="Shelters">Shelters</option>
-                                <option value="DocumentTypes">Document Types</option>
-                                <option value="HealthTopics">Health Topics</option>
-                                <option value="KitsTypes">Kits Types</option>
-                                <option value="TargetCategories">Target Categories</option>
-                                <option value="CounselingTopics">Counseling Topics</option>
-                                <option value="PHCCs">PHCCs</option>
-                                <option value="Frontliners">Frontliners</option>
-                            </select>
+                        <div class="header-actions">
+                            <div class="dropdown-container">
+                                <select id="lookup-table-select" onchange="app.loadLookupTable()">
+                                    <option value="Projects">Projects</option>
+                                    <option value="Shelters">Shelters</option>
+                                    <option value="DocumentTypes">Document Types</option>
+                                    <option value="HealthTopics">Health Topics</option>
+                                    <option value="KitsTypes">Kits Types</option>
+                                    <option value="TargetCategories">Target Categories</option>
+                                    <option value="CounselingTopics">Counseling Topics</option>
+                                    <option value="PHCCs">PHCCs</option>
+                                    <option value="Frontliners">Frontliners</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="app.showLookupModal()"><i class="fa-solid fa-plus"></i> Add Record</button>
+                            <button class="btn btn-outline" onclick="app.downloadLookupTemplate()"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                            <button class="btn btn-outline" onclick="app.startLookupImport()"><i class="fa-solid fa-file-arrow-up"></i> Import</button>
                         </div>
-                        <button class="btn btn-primary" onclick="app.showLookupModal()"><i class="fa-solid fa-plus"></i> Add Record</button>
-                        <button class="btn btn-outline" onclick="app.downloadLookupTemplate()"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
-                        <button class="btn btn-outline" onclick="app.startLookupImport()"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
                     </div>
                     <div id="lookup-import-result"></div>
                     <div class="table-container">
@@ -121,20 +135,24 @@
                 <div class="glass-card">
                     <div class="card-header">
                         <h2>Browse &amp; Edit Records</h2>
-                        <div class="dropdown-container">
-                            <select id="record-table-select" onchange="app.loadRecords()">
-                                <option value="KitsDistribution">Kits Distribution</option>
-                                <option value="KitsDistributionPeopleDetails">Kits — Household Members</option>
-                                <option value="AwarenessSessions">Awareness Sessions</option>
-                                <option value="MWCounseling">MW Counseling</option>
-                                <option value="SRAForm">SRA Forms</option>
-                            </select>
+                        <div class="header-actions">
+                            <div class="dropdown-container">
+                                <select id="record-table-select" onchange="app.loadRecords()">
+                                    <option value="KitsDistribution">Kits Distribution</option>
+                                    <option value="KitsDistributionPeopleDetails">Kits — Household Members</option>
+                                    <option value="AwarenessSessions">Awareness Sessions</option>
+                                    <option value="MWCounseling">MW Counseling</option>
+                                    <option value="SRAForm">SRA Forms</option>
+                                </select>
+                            </div>
+                            <div class="search-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="record-search" class="search-input" placeholder="Search records..."
+                                       oninput="app.renderRecords()">
+                            </div>
                         </div>
-                        <input type="text" id="record-search" placeholder="Search..."
-                               oninput="app.renderRecords()"
-                               style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: inherit;">
                     </div>
-                    <p class="mb-4" style="opacity: 0.7;">Showing the latest 200 records. Use search to narrow down, then click Edit.</p>
+                    <p class="hint"><i class="fa-solid fa-circle-info"></i> Showing the latest 200 records. Use search to narrow down, then click Edit.</p>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
@@ -152,36 +170,36 @@
             <section id="export" class="tab-content">
                 <div class="glass-card">
                     <h2>Data Extraction (.XLSX)</h2>
-                    <p class="mb-4">Download the full synchronized datasets for analysis in Microsoft Excel.</p>
-                    
+                    <p class="mb-4">Download the full synchronized datasets for analysis in Microsoft Excel, or download a fillable template and import data in bulk.</p>
+
                     <div class="export-grid">
                         <div class="export-card">
-                            <i class="fa-solid fa-box-open text-cyan"></i>
+                            <div class="export-icon" style="background: var(--tint-blue-bg); color: var(--tint-blue-fg);"><i class="fa-solid fa-box-open"></i></div>
                             <h3>Kits Distribution</h3>
-                            <button class="btn btn-outline" onclick="app.exportData('KitsDistribution')">Download XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('KitsDistribution')">Download Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('KitsDistribution')">Import Data</button>
+                            <button class="btn btn-primary" onclick="app.exportData('KitsDistribution')"><i class="fa-solid fa-download"></i> Export XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('KitsDistribution')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('KitsDistribution')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
                         </div>
                         <div class="export-card">
-                            <i class="fa-solid fa-users text-cyan"></i>
+                            <div class="export-icon" style="background: var(--tint-violet-bg); color: var(--tint-violet-fg);"><i class="fa-solid fa-people-group"></i></div>
                             <h3>Awareness Sessions</h3>
-                            <button class="btn btn-outline" onclick="app.exportData('AwarenessSessions')">Download XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('AwarenessSessions')">Download Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('AwarenessSessions')">Import Data</button>
+                            <button class="btn btn-primary" onclick="app.exportData('AwarenessSessions')"><i class="fa-solid fa-download"></i> Export XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('AwarenessSessions')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('AwarenessSessions')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
                         </div>
                         <div class="export-card">
-                            <i class="fa-solid fa-clipboard-user text-cyan"></i>
+                            <div class="export-icon" style="background: var(--tint-amber-bg); color: var(--tint-amber-fg);"><i class="fa-solid fa-clipboard-user"></i></div>
                             <h3>MW Counseling</h3>
-                            <button class="btn btn-outline" onclick="app.exportData('MWCounseling')">Download XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('MWCounseling')">Download Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('MWCounseling')">Import Data</button>
+                            <button class="btn btn-primary" onclick="app.exportData('MWCounseling')"><i class="fa-solid fa-download"></i> Export XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('MWCounseling')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('MWCounseling')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
                         </div>
                         <div class="export-card">
-                            <i class="fa-solid fa-child text-cyan"></i>
+                            <div class="export-icon" style="background: var(--tint-rose-bg); color: var(--tint-rose-fg);"><i class="fa-solid fa-child-reaching"></i></div>
                             <h3>SRA Forms</h3>
-                            <button class="btn btn-outline" onclick="app.exportData('SRAForm')">Download XLSX</button>
-                            <button class="btn btn-outline" onclick="app.downloadTemplate('SRAForm')">Download Template</button>
-                            <button class="btn btn-outline" onclick="app.startImport('SRAForm')">Import Data</button>
+                            <button class="btn btn-primary" onclick="app.exportData('SRAForm')"><i class="fa-solid fa-download"></i> Export XLSX</button>
+                            <button class="btn btn-outline" onclick="app.downloadTemplate('SRAForm')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                            <button class="btn btn-outline" onclick="app.startImport('SRAForm')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
                         </div>
                     </div>
                     <input type="file" id="import-file-input" accept=".xlsx" style="display: none"
@@ -195,7 +213,7 @@
     <!-- Modals -->
     <div id="user-modal" class="modal">
         <div class="modal-content glass-card">
-            <span class="close-btn" onclick="app.closeModals()">&times;</span>
+            <span class="close-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></span>
             <h2>Add / Edit User</h2>
             <form id="user-form" onsubmit="app.saveUser(event)">
                 <div class="form-group">
@@ -213,32 +231,32 @@
                         <option value="Admin">Admin</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary w-100 mt-3">Save User</button>
+                <button type="submit" class="btn btn-primary w-100 mt-3"><i class="fa-solid fa-floppy-disk"></i> Save User</button>
             </form>
         </div>
     </div>
 
     <div id="lookup-modal" class="modal">
         <div class="modal-content glass-card">
-            <span class="close-btn" onclick="app.closeModals()">&times;</span>
+            <span class="close-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></span>
             <h2 id="lookup-modal-title">Add Record</h2>
             <form id="lookup-form" onsubmit="app.saveLookup(event)">
                 <div class="form-group">
                     <label>Name</label>
                     <input type="text" id="lookup-name" required placeholder="e.g. Emergency Response">
                 </div>
-                <button type="submit" class="btn btn-primary w-100 mt-3">Save Record</button>
+                <button type="submit" class="btn btn-primary w-100 mt-3"><i class="fa-solid fa-floppy-disk"></i> Save Record</button>
             </form>
         </div>
     </div>
 
     <div id="record-modal" class="modal">
         <div class="modal-content glass-card" style="max-height: 85vh; overflow-y: auto;">
-            <span class="close-btn" onclick="app.closeModals()">&times;</span>
+            <span class="close-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></span>
             <h2 id="record-modal-title">Edit Record</h2>
             <form id="record-form" onsubmit="app.saveRecord(event)">
                 <div id="record-form-fields"></div>
-                <button type="submit" class="btn btn-primary w-100 mt-3">Save Changes</button>
+                <button type="submit" class="btn btn-primary w-100 mt-3"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
             </form>
         </div>
     </div>
@@ -246,6 +264,6 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast">Message here</div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>
