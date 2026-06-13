@@ -779,7 +779,7 @@ const App = {
         const field = this._fieldFor(table, col);
         if (field) {
             if (field.type === 'date') return String(value).slice(0, 10);
-            if (field.type === 'yesno') return value == 1 ? 'Yes' : 'No';
+            if (field.type === 'yesno') return (value == 1 || value === true || String(value).toLowerCase() === 'true') ? 'Yes' : 'No';
             if (field.type === 'lookup') return this._lookupNameById[value] || value;
         }
         const s = String(value);
@@ -919,9 +919,38 @@ const App = {
             const value = row[f.col];
             if (value === null || value === undefined) { el.value = ''; return; }
             if (f.type === 'date') el.value = String(value).slice(0, 10);
-            else if (f.type === 'yesno') el.value = String(value);
+            else if (f.type === 'yesno') {
+                el.value = (value == 1 || value === true || String(value).toLowerCase() === 'true') ? '1' : '0';
+            }
             else el.value = value;
         });
+
+        if (table === 'KitsDistribution') {
+            const peopleContainer = document.createElement('div');
+            peopleContainer.id = 'drawer-people';
+            peopleContainer.innerHTML = '<p class="hint" style="margin-top:1rem"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading household members...</p>';
+            container.appendChild(peopleContainer);
+            this.api(`/api/admin/records/KitsDistribution/${encodeURIComponent(row[records.idCol])}/people`)
+                .then(r => r.json())
+                .then(json => {
+                    const el = document.getElementById('drawer-people');
+                    if (!el) return;
+                    if (json.success && json.data.length > 0) {
+                        let html = '<hr><h3 style="margin: 1rem 0 0.5rem; font-size: 1rem;">Household Members</h3><table class="table" style="font-size:0.85rem; width:100%"><thead><tr><th style="text-align:left">Age</th><th style="text-align:left">Gender</th><th style="text-align:left">Nationality</th></tr></thead><tbody>';
+                        json.data.forEach(p => {
+                            html += `<tr><td>${p.Age || 0}</td><td>${p.Gender || 'N/A'}</td><td>${p.Nationality || 'N/A'}</td></tr>`;
+                        });
+                        html += '</tbody></table>';
+                        el.innerHTML = html;
+                    } else {
+                        el.innerHTML = '<hr><p class="hint">No household members attached to this record.</p>';
+                    }
+                })
+                .catch(err => {
+                    const el = document.getElementById('drawer-people');
+                    if (el) el.innerHTML = '';
+                });
+        }
 
         document.getElementById('drawer').classList.add('show');
         document.getElementById('drawer-backdrop').classList.add('show');
@@ -961,6 +990,28 @@ const App = {
         } catch (err) {
             console.error(err);
             this.showToast('Failed to update record', 'error');
+        }
+    },
+
+    async deleteRecord() {
+        const editing = this._editingRecord;
+        if (!editing) return;
+        const ok = await this.confirmDialog(`Delete this record from ${this._recordTables[editing.table] || editing.table}? This cannot be undone.`);
+        if (!ok) return;
+        try {
+            const res = await this.api(`/api/admin/records/${editing.table}/${encodeURIComponent(editing.id)}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (json.success) {
+                this.closeDrawer();
+                this.showToast('Record deleted');
+                this.loadRecords();
+                this.loadStats();
+            } else {
+                this.showToast(json.error || 'Failed to delete record', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            this.showToast('Failed to delete record', 'error');
         }
     },
 

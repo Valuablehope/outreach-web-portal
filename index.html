@@ -226,7 +226,8 @@
         </div>
         <form id="record-form" onsubmit="app.saveRecord(event)">
             <div id="record-form-fields" class="drawer-body"></div>
-            <div class="drawer-foot">
+            <div class="drawer-foot" style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn btn-danger" id="drawer-delete-btn" onclick="app.deleteRecord()" style="margin-right: auto"><i class="fa-solid fa-trash"></i> Delete</button>
                 <button type="button" class="btn btn-outline" onclick="app.closeDrawer()">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
             </div>
