@@ -460,7 +460,7 @@ const App = {
         const id = this._editingNotificationId;
 
         const payload = { MessageText: msg, IsActive: active, ExpiryDate: expiry || null };
-        const url = id ? /api/admin/notifications/ + encodeURIComponent(id) : /api/admin/notifications;
+        const url = id ? `/api/admin/notifications/` + encodeURIComponent(id) : `/api/admin/notifications`;
         const method = id ? 'PUT' : 'POST';
 
         try {
@@ -486,7 +486,7 @@ const App = {
     async deleteNotification(id) {
         if (!await this.confirmDialog('Delete this notification?')) return;
         try {
-            const res = await this.api(/api/admin/notifications/ + encodeURIComponent(id), { method: 'DELETE' });
+            const res = await this.api(`/api/admin/notifications/` + encodeURIComponent(id), { method: 'DELETE' });
             if ((await res.json()).success) {
                 this.loadNotifications();
                 this.showToast('Notification deleted');
