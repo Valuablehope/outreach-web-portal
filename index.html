@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=11">
+    <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 
@@ -137,20 +137,22 @@
                             <button class="btn btn-primary" onclick="app.editNotification()"><i class="fa-solid fa-plus"></i> New Notification</button>
                         </div>
                     </div>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Message</th>
-                                <th>Active</th>
-                                <th>Expiry Date</th>
-                                <th>Created At</th>
-                                <th style="width: 80px">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="notifications-table-body">
-                            <!-- populated by js -->
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Message</th>
+                                    <th>Active</th>
+                                    <th>Expiry Date</th>
+                                    <th>Created At</th>
+                                    <th class="th-actions" style="width: 80px">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="notifications-table-body">
+                                <!-- populated by js -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
             <section id="users" class="tab-content">
@@ -282,10 +284,7 @@
                     <label>Expiry Date (Optional)</label>
                     <input type="datetime-local" id="notif-expiry">
                 </div>
-                <div class="modal-foot">
-                    <button type="button" class="btn btn-outline" onclick="app.closeModals()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-3"><i class="fa-solid fa-floppy-disk"></i> Save Notification</button>
             </form>
         </div>
     </div>
@@ -360,6 +359,6 @@
     <!-- Toast stack -->
     <div id="toast-stack" class="toast-stack"></div>
 
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=12"></script>
 </body>
 </html>
