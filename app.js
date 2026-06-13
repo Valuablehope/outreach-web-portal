@@ -419,18 +419,18 @@ const App = {
             const tbody = document.getElementById('notifications-table-body');
             if (json.success) {
                 this._notifications = json.data;
-                tbody.innerHTML = json.data.map(n => 
+                tbody.innerHTML = json.data.map(n => `
                     <tr>
-                        <td> + (n.MessageText || '') + </td>
-                        <td><span class="badge  + (n.IsActive ? 'badge-success' : 'badge-danger') + "> + (n.IsActive ? 'Yes' : 'No') + </span></td>
-                        <td> + (n.ExpiryDate ? new Date(n.ExpiryDate).toLocaleString() : 'N/A') + </td>
-                        <td> + new Date(n.CreatedAt).toLocaleString() + </td>
+                        <td>${n.MessageText || ''}</td>
+                        <td><span class="badge ${n.IsActive ? 'badge-success' : 'badge-danger'}">${n.IsActive ? 'Yes' : 'No'}</span></td>
+                        <td>${n.ExpiryDate ? new Date(n.ExpiryDate).toLocaleString() : 'N/A'}</td>
+                        <td>${new Date(n.CreatedAt).toLocaleString()}</td>
                         <td>
-                            <button class="icon-btn" onclick="app.editNotification(' + n.NotificationID + ')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                            <button class="icon-btn text-danger" onclick="app.deleteNotification(' + n.NotificationID + ')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                            <button class="icon-btn" onclick="app.editNotification('${n.NotificationID}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                            <button class="icon-btn text-danger" onclick="app.deleteNotification('${n.NotificationID}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     </tr>
-                ).join('');
+                `).join('');
                 if (json.data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No notifications found</td></tr>';
                 }
