@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 
@@ -50,6 +50,7 @@
             <ul class="nav-links">
                 <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i><span>Dashboard</span></li>
                 <li data-tab="users"><i class="fa-solid fa-users-gear"></i><span>Users</span></li>
+                <li data-tab="notifications"><i class="fa-solid fa-bell"></i><span>Notifications</span></li>
                 <li data-tab="lookups"><i class="fa-solid fa-list-check"></i><span>Lookups Setup</span></li>
                 <li data-tab="records"><i class="fa-solid fa-table-list"></i><span>Records</span></li>
                 <li data-tab="export"><i class="fa-solid fa-file-export"></i><span>Data Hub</span></li>
@@ -128,6 +129,30 @@
             </section>
 
             <!-- Users -->
+            <section id="notifications" class="tab-content">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3><i class="fa-solid fa-bell"></i> App Notifications</h3>
+                        <div class="head-actions">
+                            <button class="btn btn-primary" onclick="app.editNotification()"><i class="fa-solid fa-plus"></i> New Notification</button>
+                        </div>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Message</th>
+                                <th>Active</th>
+                                <th>Expiry Date</th>
+                                <th>Created At</th>
+                                <th style="width: 80px">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="notifications-table-body">
+                            <!-- populated by js -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
             <section id="users" class="tab-content">
                 <div class="panel">
                     <div class="panel-head">
@@ -235,6 +260,35 @@
     </aside>
 
     <!-- Modals -->
+    <div id="notification-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-head">
+                <h2 id="notification-modal-title">Add Notification</h2>
+                <button class="icon-btn" onclick="app.closeModals()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="notification-form" onsubmit="app.saveNotification(event)">
+                <div class="form-group full">
+                    <label>Message Text</label>
+                    <textarea id="notif-message" required rows="4" placeholder="Enter notification message here..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Is Active</label>
+                    <select id="notif-active" required>
+                        <option value="1">Yes</option>
+                        <option value="0">No</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Expiry Date (Optional)</label>
+                    <input type="datetime-local" id="notif-expiry">
+                </div>
+                <div class="modal-foot">
+                    <button type="button" class="btn btn-outline" onclick="app.closeModals()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div id="user-modal" class="modal">
         <div class="modal-content">
             <div class="modal-head">
@@ -306,6 +360,6 @@
     <!-- Toast stack -->
     <div id="toast-stack" class="toast-stack"></div>
 
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
 </body>
 </html>

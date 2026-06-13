@@ -185,6 +185,7 @@ const App = {
         if (tabId === 'users') this.loadUsers();
         if (tabId === 'lookups') this.loadLookupTable();
         if (tabId === 'records') this.loadRecords();
+        if (tabId === 'notifications') this.loadNotifications();
     },
 
     // ------------------------------------------------------------
@@ -408,6 +409,93 @@ const App = {
     },
 
     // ------------------------------------------------------------
+    // ------------------------------------------------------------
+    // NOTIFICATIONS
+    // ------------------------------------------------------------
+    async loadNotifications() {
+        try {
+            const res = await this.api('/api/admin/notifications');
+            const json = await res.json();
+            const tbody = document.getElementById('notifications-table-body');
+            if (json.success) {
+                this._notifications = json.data;
+                tbody.innerHTML = json.data.map(n => 
+                    <tr>
+                        <td> + (n.MessageText || '') + </td>
+                        <td><span class="badge  + (n.IsActive ? 'badge-success' : 'badge-danger') + "> + (n.IsActive ? 'Yes' : 'No') + </span></td>
+                        <td> + (n.ExpiryDate ? new Date(n.ExpiryDate).toLocaleString() : 'N/A') + </td>
+                        <td> + new Date(n.CreatedAt).toLocaleString() + </td>
+                        <td>
+                            <button class="icon-btn" onclick="app.editNotification(' + n.NotificationID + ')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                            <button class="icon-btn text-danger" onclick="app.deleteNotification(' + n.NotificationID + ')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                ).join('');
+                if (json.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No notifications found</td></tr>';
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            this.showToast('Failed to load notifications', 'error');
+        }
+    },
+
+    editNotification(id) {
+        let n = id ? this._notifications.find(x => x.NotificationID === id) : null;
+        this._editingNotificationId = id || null;
+        document.getElementById('notification-modal-title').innerText = id ? 'Edit Notification' : 'Add Notification';
+        document.getElementById('notif-message').value = n ? n.MessageText : '';
+        document.getElementById('notif-active').value = n && n.IsActive ? '1' : '0';
+        document.getElementById('notif-expiry').value = n && n.ExpiryDate ? new Date(new Date(n.ExpiryDate).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : '';
+        
+        document.getElementById('notification-modal').classList.add('show');
+    },
+
+    async saveNotification(e) {
+        e.preventDefault();
+        const msg = document.getElementById('notif-message').value;
+        const active = document.getElementById('notif-active').value === '1';
+        const expiry = document.getElementById('notif-expiry').value;
+        const id = this._editingNotificationId;
+
+        const payload = { MessageText: msg, IsActive: active, ExpiryDate: expiry || null };
+        const url = id ? /api/admin/notifications/ + encodeURIComponent(id) : /api/admin/notifications;
+        const method = id ? 'PUT' : 'POST';
+
+        try {
+            const res = await this.api(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (json.success) {
+                this.closeModals();
+                this.loadNotifications();
+                this.showToast(id ? 'Notification updated' : 'Notification created');
+            } else {
+                this.showToast(json.error || 'Failed to save', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            this.showToast('Failed to save notification', 'error');
+        }
+    },
+
+    async deleteNotification(id) {
+        if (!await this.confirmDialog('Delete this notification?')) return;
+        try {
+            const res = await this.api(/api/admin/notifications/ + encodeURIComponent(id), { method: 'DELETE' });
+            if ((await res.json()).success) {
+                this.loadNotifications();
+                this.showToast('Notification deleted');
+            }
+        } catch (e) {
+            console.error(e);
+            this.showToast('Failed to delete notification', 'error');
+        }
+    },
     // USERS
     // ------------------------------------------------------------
     async loadUsers() {
