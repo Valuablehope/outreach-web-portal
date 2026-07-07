@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://aims-progress-invest-output.trycloudflare.com';
+const API_BASE_URL = 'https://tahoe-following-floating-attitudes.trycloudflare.com';
 
 const App = {
     // ------------------------------------------------------------
