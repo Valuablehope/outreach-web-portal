@@ -754,7 +754,7 @@ const App = {
 
     _recordConfigs: {
         KitsDistribution: {
-            display: ['DistributionDate', 'Name', 'Gender', 'Nationality', 'KitTypeID', 'ShelterID', 'NumberOfPeopleServed'],
+            display: ['DistributionDate', 'Name', 'Gender', 'Nationality', 'KitTypeID', 'ShelterID', 'AdditionalHouseholdMembersServed'],
             fields: [
                 { col: 'DistributionDate', label: 'Distribution Date', type: 'date' },
                 { col: 'Name', label: 'Head of Household Name', type: 'text' },
@@ -763,7 +763,7 @@ const App = {
                 { col: 'Nationality', label: 'Nationality', type: 'text' },
                 { col: 'DateOfBirth', label: 'Date of Birth', type: 'date' },
                 { col: 'KitTypeID', label: 'Kit Type', type: 'lookup', lookup: 'kitsType' },
-                { col: 'NumberOfPeopleServed', label: 'Number of People Served', type: 'number' },
+                { col: 'AdditionalHouseholdMembersServed', label: 'Additional Household Members Served', type: 'number' },
                 { col: 'ShelterID', label: 'Shelter', type: 'lookup', lookup: 'shelters' },
                 { col: 'ProjectID', label: 'Project', type: 'lookup', lookup: 'projects' },
                 { col: 'IsDisplaced', label: 'Is Displaced', type: 'yesno' },
