@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://desktop-3m8rttr.taild3b826.ts.net';
+const API_BASE_URL = 'http://localhost:3000';
 
 const App = {
     // ------------------------------------------------------------
