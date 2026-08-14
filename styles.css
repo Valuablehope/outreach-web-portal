@@ -600,6 +600,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 .badge-admin { background: var(--tint-violet-bg); color: var(--tint-violet-fg); }
 .badge-worker { background: var(--tint-teal-bg); color: var(--tint-teal-fg); }
+.badge-supervisor { background: var(--tint-amber-bg); color: var(--tint-amber-fg); }
 
 /* Skeleton + empty states */
 .skeleton-rows { height: 120px; border-radius: 8px;

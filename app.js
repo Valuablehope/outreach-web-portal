@@ -25,6 +25,13 @@ const App = {
     // AUTH
     // ------------------------------------------------------------
     _token() { return localStorage.getItem('pui-token'); },
+    _role() { return localStorage.getItem('pui-role') || 'Admin'; },
+    isSupervisor() { return this._role().toLowerCase() === 'supervisor'; },
+
+    // Tabs a Supervisor is allowed to see. Everything else stays hidden in
+    // the sidebar and gets redirected to the dashboard if navigated to
+    // directly (e.g. via the command palette or a stale click handler).
+    SUPERVISOR_TABS: ['dashboard', 'records', 'export'],
 
     // Authenticated fetch for /api/admin endpoints; a 401 means the
     // token expired (or the server restarted) — back to the login screen.
@@ -57,8 +64,21 @@ const App = {
         const avatar = document.getElementById('user-avatar');
         avatar.innerText = username.slice(0, 2).toUpperCase();
         avatar.style.background = this._avatarColor(username);
+        this.applyRolePermissions();
         this.navigate('dashboard');
         this.loadDashboard();
+    },
+
+    // Hides nav items (and re-renders the export grid) a Supervisor
+    // shouldn't see. Actual enforcement lives server-side; this just
+    // keeps the UI honest with what the API will allow.
+    applyRolePermissions() {
+        const restricted = this.isSupervisor();
+        document.querySelectorAll('.nav-links li').forEach(item => {
+            const tab = item.getAttribute('data-tab');
+            item.hidden = restricted && !this.SUPERVISOR_TABS.includes(tab);
+        });
+        this.renderExportGrid();
     },
 
     async login(e) {
@@ -82,6 +102,7 @@ const App = {
             if (json && json.success) {
                 localStorage.setItem('pui-token', json.token);
                 localStorage.setItem('pui-user', json.username);
+                localStorage.setItem('pui-role', json.role || 'Admin');
                 document.getElementById('login-password').value = '';
                 this.showApp();
                 this.showToast(`Welcome back, ${json.username}!`);
@@ -111,6 +132,7 @@ const App = {
     forceLogout(message) {
         localStorage.removeItem('pui-token');
         localStorage.removeItem('pui-user');
+        localStorage.removeItem('pui-role');
         this.closeDrawer();
         this.closePalette();
         document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
@@ -174,6 +196,7 @@ const App = {
     },
 
     navigate(tabId) {
+        if (this.isSupervisor() && !this.SUPERVISOR_TABS.includes(tabId)) tabId = 'dashboard';
         document.querySelectorAll('.nav-links li').forEach(i =>
             i.classList.toggle('active', i.getAttribute('data-tab') === tabId));
         document.querySelectorAll('.tab-content').forEach(c =>
@@ -532,14 +555,18 @@ const App = {
         tbody.innerHTML = users.map(user => {
             const i = this._usersData.indexOf(user);
             const role = user.Role || 'FieldWorker';
-            const isAdmin = role.toLowerCase() === 'admin';
+            const roleLower = role.toLowerCase();
+            const isAdmin = roleLower === 'admin';
+            const isSupervisor = roleLower === 'supervisor';
+            const badgeClass = isAdmin ? 'badge-admin' : isSupervisor ? 'badge-supervisor' : 'badge-worker';
+            const badgeIcon = isAdmin ? 'fa-user-shield' : isSupervisor ? 'fa-user-tie' : 'fa-user';
             const initials = user.Username.slice(0, 2).toUpperCase();
             return `<tr>
                 <td><div class="user-cell">
                     <span class="avatar" style="background:${this._avatarColor(user.Username)}">${initials}</span>
                     ${user.Username}</div></td>
-                <td><span class="badge ${isAdmin ? 'badge-admin' : 'badge-worker'}">
-                    <i class="fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-user'}"></i> ${role}</span></td>
+                <td><span class="badge ${badgeClass}">
+                    <i class="fa-solid ${badgeIcon}"></i> ${role}</span></td>
                 <td><div class="row-actions">
                     <button class="btn btn-outline btn-sm" onclick="app.editUser(${i})"><i class="fa-solid fa-pen"></i> Edit</button>
                     <button class="btn btn-danger btn-sm" onclick="app.deleteUser('${user.Username}')"><i class="fa-solid fa-trash-can"></i></button>
@@ -979,9 +1006,13 @@ const App = {
         if (!row) return;
         const table = records.table;
         const config = this._recordConfigs[table];
+        const readOnly = this.isSupervisor();
         this._editingRecord = { table, id: row[records.idCol] };
 
-        document.getElementById('drawer-title').innerText = `Edit ${this._recordTables[table] || table}`;
+        document.getElementById('drawer-title').innerText =
+            `${readOnly ? 'View' : 'Edit'} ${this._recordTables[table] || table}`;
+        document.getElementById('drawer-delete-btn').hidden = readOnly;
+        document.querySelector('#record-form button[type="submit"]').hidden = readOnly;
         const container = document.getElementById('record-form-fields');
         container.innerHTML = config.fields.map(f => {
             let input;
@@ -1004,6 +1035,7 @@ const App = {
         // Set values programmatically so Arabic text and quotes are safe
         config.fields.forEach(f => {
             const el = document.getElementById(`rf-${f.col}`);
+            el.disabled = readOnly;
             const value = row[f.col];
             if (value === null || value === undefined) { el.value = ''; return; }
             if (f.type === 'date') el.value = String(value).slice(0, 10);
@@ -1114,6 +1146,7 @@ const App = {
     ],
 
     renderExportGrid() {
+        const restricted = this.isSupervisor();
         document.getElementById('export-grid').innerHTML = this._exportMeta.map(m => `
             <div class="export-card">
                 <div class="export-card-top">
@@ -1123,8 +1156,9 @@ const App = {
                 </div>
                 <div class="export-card-actions">
                     <button class="btn btn-primary" onclick="app.exportData('${m.table}')"><i class="fa-solid fa-download"></i> Export XLSX</button>
+                    ${restricted ? '' : `
                     <button class="btn btn-outline" onclick="app.downloadTemplate('${m.table}')"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
-                    <button class="btn btn-outline" onclick="app.startImport('${m.table}')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>
+                    <button class="btn btn-outline" onclick="app.startImport('${m.table}')"><i class="fa-solid fa-file-arrow-up"></i> Import Data</button>`}
                 </div>
             </div>`).join('');
     },
@@ -1211,19 +1245,27 @@ const App = {
     // COMMAND PALETTE
     // ------------------------------------------------------------
     _paletteActions() {
-        const nav = Object.entries(this._titles).map(([tab, label]) => ({
-            icon: 'fa-location-arrow', label: `Go to ${label}`, hint: 'Navigate',
-            run: () => this.navigate(tab),
-        }));
-        const data = this._exportMeta.flatMap(m => ([
+        const restricted = this.isSupervisor();
+        const nav = Object.entries(this._titles)
+            .filter(([tab]) => !restricted || this.SUPERVISOR_TABS.includes(tab))
+            .map(([tab, label]) => ({
+                icon: 'fa-location-arrow', label: `Go to ${label}`, hint: 'Navigate',
+                run: () => this.navigate(tab),
+            }));
+        const data = this._exportMeta.flatMap(m => restricted ? ([
+            { icon: 'fa-download', label: `Export ${m.label}`, hint: 'XLSX', run: () => this.exportData(m.table) },
+        ]) : ([
             { icon: 'fa-download', label: `Export ${m.label}`, hint: 'XLSX', run: () => this.exportData(m.table) },
             { icon: 'fa-file-arrow-down', label: `Download ${m.label} template`, hint: 'XLSX', run: () => this.downloadTemplate(m.table) },
             { icon: 'fa-file-arrow-up', label: `Import ${m.label}`, hint: 'Upload', run: () => this.startImport(m.table) },
         ]));
-        return [
-            ...nav,
+        const adminOnly = restricted ? [] : [
             { icon: 'fa-user-plus', label: 'Add new user', hint: 'Users', run: () => { this.navigate('users'); this.showUserModal(); } },
             { icon: 'fa-plus', label: 'Add lookup record', hint: 'Lookups', run: () => { this.navigate('lookups'); this.showLookupModal(); } },
+        ];
+        return [
+            ...nav,
+            ...adminOnly,
             { icon: 'fa-rotate', label: 'Refresh dashboard', hint: 'Dashboard', run: () => { this.navigate('dashboard'); this.loadDashboard(true); } },
             { icon: 'fa-circle-half-stroke', label: 'Toggle dark / light theme', hint: 'Theme', run: () => this.toggleTheme() },
             { icon: 'fa-right-from-bracket', label: 'Sign out', hint: 'Session', run: () => this.logout() },
